@@ -18,10 +18,13 @@ b)Train with offline_train.py:
 	during the recording, not the maximum range at which you want to train
 
 c)Test on live data with hpr.py:
+
 	Publish laser scans on topic /scan, enable intensities, set min_angle, max_angle to -45,45 degrees
 	respectively (to be changed).
 	
 
-RECOMMENDATION: Use same timewindow, and wall set time for each training set, and use the same values when
+RECOMMENDATION:
+
+	Use same timewindow, and wall set time for each training set, and use the same values when
 	evaluating
     
