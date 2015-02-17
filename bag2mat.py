@@ -1,25 +1,33 @@
 #!/usr/bin/env python
-__author__="athanasia sapountzi"
+__author__="athanasia sapountzi, lydakis andreas, stavrinos georgios"
 
 import roslib, warnings, rospy, math, pickle
 import numpy as np
 import scipy.io as sio
-
+import os
+import sys
+from os.path import exists
 from sensor_msgs.msg import LaserScan
 
 limit=0
 counter=1
-save_file ='mat_files/'
+save_file = ''
 def laser_listener():
 
     global limit
     global save_file
     rospy.init_node('laser_listener', anonymous=True)
     sub_topic = ''
-    #save_file = 'mat_files/'
-    filename=input('Enter data file name: ')
-    #if save_file=='mat_files/':
-    save_file=save_file+filename
+    while True :
+        try:
+            save_file=raw_input('Enter data file name: ')
+            break
+        except SyntaxError:
+            print 'Try again'
+    d = os.path.dirname(save_file)
+    if d!='':
+        if not os.path.exists(d):
+            os.makedirs(d)
     print 'Data will be saved as {0}'.format(save_file)
     while sub_topic == '':
 		sub_topic = raw_input('Please input laser scan topic: ')
@@ -52,7 +60,7 @@ def converter(laserscan):
 
     if counter==limit:
         print 'Conversion is complete'
-        print 'saving data'
+        print 'Saving data'
         b={}
         b['ranges']=ranges
         b['angle_increment']=angle_increment
@@ -64,7 +72,7 @@ def converter(laserscan):
         sio.savemat('bagfile_test',b)
         b['time_increment']=time_increment
         print 'Data is stored'
-        #exit()
+        rospy.signal_shutdown('Exit')
 
     counter=counter+1
 

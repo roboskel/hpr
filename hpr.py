@@ -24,17 +24,40 @@ counter=0
 limit=40
 
 plt.ion()
+
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+        
+def RepresentsFloat(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+        
 def laser_listener():
 
     global timewindow,range_limit
 
     rospy.init_node('laser_listener', anonymous=True)
     sub_topic = "scan"
-    print 'insert timewindow'
-    timewindow=input()
-    print 'set max distance'
-    range_limit=input()
-
+    while True:
+        timewindow=raw_input('Set timewindow in frames: ')
+        if RepresentsInt(timewindow):
+            break
+        else:
+            print 'Try again'
+    while True:
+        range_limit=input('Set maximum scan range: ')
+        if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+            break
+        else:
+            print 'Try again'
+   
     print('Subscribing to: %s' % sub_topic)
     rospy.Subscriber(sub_topic,LaserScan,online_test)
     rospy.spin()

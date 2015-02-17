@@ -2,15 +2,14 @@
 Real time recongition of humans through laser scans
 
 a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py'
-	Create a folder named 'mat_files' (to be corrected)
-	Enter desired destination file name as '<x>.mat', including the single quotes
-	file will be saved as : ./mat_files/<input>
+	Enter desired destination with file ending in .mat
 
 b)Train with offline_train.py:
-	When asked, input file should be : 'mat_files/<mat_file>', 
-	including the single quotes
+	Enter timewindow (int)
+	Enter frames to set wall (int)
+	Enter max range scanned (float)
 
-	trained data will be saved in as : mat_files/<data_files>
+	trained data will be saved as : <input>.<trainingdata>
 	!!!When asked for max laser range, input the maximum range scanned 
 	during the recording, not the maximum range at which you want to train
 
