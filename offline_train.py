@@ -20,9 +20,6 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 ccnames =['GRAY', 'BLACK', 'VIOLET', 'BLUE', 'CYAN', 'ROSY', 'ORANGE', 'RED', 'GREEN', 'BROWN', 'YELLOW', 'GOLD']
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
-#ccnames =['BLUE', 'RED']
-#cc  =  ['#0000FF', 'r']
-
 
 fr_index=0
 z_scale= float(5*40) / float(3600)
@@ -40,16 +37,54 @@ timewindow=40
 filename='asd'
 #mat_file='mat_files/'
 
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+        
+def RepresentsFloat(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+        
 def offline_train():
 
     global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
     global z, zscale, slot_count, human_l ,cluster_l,slot_touched,all_scans
     global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename
     
-    timewindow=input('Set timewindow in frames: ')
-    wall_end=input('Set max frames for wall setting: ')
-    range_limit=input('Set maximum scan range: ')
-    filename=input('Enter data file name: ')
+    while True:
+        timewindow=raw_input('Set timewindow in frames: ')
+        if RepresentsInt(timewindow):
+            break
+        else:
+            print 'Try again'
+    while True:
+        wall_end=input('Set max frames for wall setting: ')
+        if RepresentsInt(wall_end):
+            break
+        else:
+            print 'Try again'
+    while True:
+        range_limit=input('Set maximum scan range: ')
+        if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+            break
+        else:
+            print 'Try again'
+   
+    while True :
+        try:
+            filename=raw_input('Enter data file name: ')
+            if os.path.isfile(filename):
+                break
+            else:
+                print 'File does not exist! Try again!'
+        except SyntaxError:
+            print 'Try again'
     #mat=sio.loadmat('bagfile_data.mat')
     mat=sio.loadmat(filename)
     #mat=sio.loadmat(prefix+filename+'.mat')
