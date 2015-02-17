@@ -1,13 +1,17 @@
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans
 
-a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py'
+a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
+
 	Enter desired destination with file ending in .mat
 
 b)Train with offline_train.py:
-	Enter timewindow (int)
-	Enter frames to set wall (int)
-	Enter max range scanned (float)
+
+	*Enter timewindow (int)
+	
+	*Enter frames to set wall (int)
+	
+	*Enter max range scanned (float)
 
 	trained data will be saved as : <input>.<trainingdata>
 	!!!When asked for max laser range, input the maximum range scanned 
