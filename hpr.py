@@ -46,8 +46,9 @@ def laser_listener():
     rospy.init_node('laser_listener', anonymous=True)
     sub_topic = "scan"
     while True:
-        timewindow=raw_input('Set timewindow in frames: ')
+        timewindow=input('Set timewindow in frames: ')
         if RepresentsInt(timewindow):
+            z_scale= float(5*timewindow) / float(3600)
             break
         else:
             print 'Try again'
