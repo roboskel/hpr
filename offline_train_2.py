@@ -79,7 +79,6 @@ def offline_train():
     fr_index=0
     z_scale= float(5*timewindow) / float(3600)
     z=-z_scale
-    slot_count=0
 
     while True :
         try:
@@ -164,13 +163,15 @@ def offline_train():
             if ((fr_index % timewindow )== 0):
                 #print'Buffer3'
                 mybuffer=mybuffer[np.where(mybuffer[:,0] > 0.2),:][0]
-                print 'slot count : {0}'.format(slot_count)
+                
                 print 'empty scans: {0}'.format(em_index)
                 cluster_labels,human,hogs,ann,surfaces=cluster_train(mybuffer) #clustering
 
                 if len(hogs)!=0:
                     print'len(hogs)!=0'
                     slot_count=slot_count+1
+                    print 'File : {0}'.format(filename)
+                    print 'slot count : {0} || limit :{1}'.format(slot_count, limit)
                     ha=np.array(slot_count*np.ones(len(mybuffer))) #data point -> slot_number
 
                     if slot_count==1:
@@ -191,9 +192,10 @@ def offline_train():
                             human_l=np.hstack((human_l,human))
                             annotations=np.hstack((annotations,ann))
                     
-                    if slot_count==limit-1 :
+                    if slot_count==limit :
                         build_classifier(np.array(all_hogs),np.array(annotations))
                         save_data()
+                        exit()
                     if slot_count>limit:
                         print 'EXITING'
                         exit()
