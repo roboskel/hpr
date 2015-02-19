@@ -6,6 +6,7 @@ a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
 	Enter desired destination with file ending in .mat
 
 b)Train with offline_train_2.py:
+
 Either provide command line arguments with the same order as below, or run the script without arguments and provide them when prompted
 	*Enter timewindow (int)
 	
