@@ -18,7 +18,7 @@ cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g',
 wall_flag=0
 fr_index=1
 z=0
-z_scale= float(5*40) / float(3600)
+z_scale= float(5*25) / float(3600)
 w_index=1
 counter=0
 limit=40
@@ -48,7 +48,6 @@ def laser_listener():
     while True:
         timewindow=input('Set timewindow in frames: ')
         if RepresentsInt(timewindow):
-            z_scale= float(5*timewindow) / float(3600)
             break
         else:
             print 'Try again'
@@ -64,12 +63,13 @@ def laser_listener():
     rospy.spin()
 
 def online_test(laser_data):
-
     global wall_flag , wall , fr_index ,  intens ,w_index,phi,sampling
     global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1, kat
 
     if wall_flag==0:
+        #print "-------------- 1"
         if w_index==1:
+            #print "-------------- 2"
             #print 'Reduce points by 2? 1/0'
            # if input()==1 :
             sampling=np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
@@ -82,21 +82,25 @@ def online_test(laser_data):
             wall[filter]=range_limit
             w_index=w_index+1
         if w_index<limit:
+            #print "-------------- 3"
             wall=np.array(laser_data.ranges)
             filter=np.where(wall>=range_limit)
             wall[filter]=range_limit
             mybuffer=np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 360)
             w_index=w_index+1
         if w_index==limit:
+            #print "-------------- 4"
             mybuffer=np.vstack((mybuffer,wall ))
             phi=np.arange(laser_data.angle_min,laser_data.angle_max,laser_data.angle_increment)[sampling]
             wall=(np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart=np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag=1
             kat,ax=initialize_plots(wall_cart)
+            #kat=initialize_plots(wall_cart)
             print 'walls set...'
         
     else:
+        #print "-------------- 5"
         ranges=np.array(laser_data.ranges)[sampling]
         filter = np.where(ranges < wall) # filter out walls
         ranges = ranges[filter]
@@ -104,7 +108,7 @@ def online_test(laser_data):
 
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
-
+            #print "-------------- 6"
             C=np.array(pol2cart(ranges,theta,z) ) #convert to Cartesian
 
             if (fr_index ==1 ):
@@ -191,7 +195,7 @@ def clustering(clear_data):
             valid_flag=1
             #print 'extracting surface for ',ccnames[k-1],' cluster '
             vcl.append(k)
-            colors.append(ccnames[k-1])
+            colors.append(ccnames[k%12])
             grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
             grid=grid-np.amin(grid)
             hogs.append(hog(grid))  #extract hog features
@@ -214,7 +218,7 @@ def scatter_all(xi,yi,zi,cluster_labels):
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
-            ax2.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k-1])
+            ax2.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k%12])
 
     fig2.pause(0.00001)
 
@@ -242,12 +246,12 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
 
             if results[cnt]==1:
                 kat.scatter(x,y,s=20, c='r')
-                #ax.scatter(x,y, zed, 'z', 30, c='r') #human
-                #fig1.add_axes(ax)
+                ax.scatter(x,y, zed, 'z', 30, c='r') #human
+                fig1.add_axes(ax)
             else:
                 kat.scatter(x,y,s=20, c='b')
-                #ax.scatter(x,y, zed, 'z', 30, c='b') #object
-                #fig1.add_axes(ax)
+                ax.scatter(x,y, zed, 'z', 30, c='b') #object
+                fig1.add_axes(ax)
             cnt=cnt+1
         plt.pause(0.0001)
 

@@ -1,0 +1,34 @@
+bag2mat.py :
+    convert bag files to matlab arrays (WORKING)
+    Before running, delete the existing bagfile_data.mat, the program 
+    does not override the existing file
+    file will be saved as : ./mat_files/<input>
+
+offline_train.py :
+    When asked, input file should be : 'mat_files/<mat_file>', 
+    including the single quotes
+    
+    trained data will be saved in as : mat_files/<data_files>
+    !!!When asked for max laser range, input the maximum range scanned 
+    during the recording, not the maximum range at which you want to train
+    
+    changed limit check to limit-1
+    
+    fr_index should be increased even on empty scan receive
+    data is saved outside the main for loop, no chance of not saving
+    
+    classifier was being created from scratch each time the program ran
+    
+    colors cycle with %2 to avoid crashing
+    
+    for dataset 'cinema16' timewindow of 20 frames will cause the training
+    to crash
+    
+gtxs:
+    files are coded as such: a_b_c_d_e_f.png where
+    a: filename
+    b: p<number of obstacles>
+    c: h<number of humans><m(oving)/s(tatic)>
+    d: annotation of cluster (h/o)
+    e: 2d/3d 
+    f: identifier for similar conditions
