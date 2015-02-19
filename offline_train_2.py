@@ -2,15 +2,18 @@
 __author__="athanasia sapountzi"
 
 import  pickle
-from gridfit import gridfit
+import os.path
+import sys
 import numpy as np
 import scipy.io as sio
-from scipy import special
 import matplotlib.pyplot as plt
+#import time
 from mytools import princomp,dbscan
 from myhog import hog
+from scipy import special
 from scipy.stats.mstats import zscore
-import os.path
+from gridfit import gridfit
+
 
 #pre-made classifiers
 from sklearn.naive_bayes import GaussianNB
@@ -35,6 +38,8 @@ wall_index=1
 em_index=0
 timewindow=40
 filename=''
+wall_end = 0
+range_limit = 0
 
 def RepresentsInt(s):
     try: 
@@ -50,45 +55,103 @@ def RepresentsFloat(s):
     except ValueError:
         return False
         
-def offline_train():
-
-    global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
-    global z, zscale, slot_count, human_l ,cluster_l,slot_touched,all_scans
-    global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename
+        
+def check_args(arg_list):
+    global timewindow, range_limit, wall_end, filename
+    print (arg_list)
     
-    while True:
-        timewindow=raw_input('Set timewindow in frames: ')
-        if RepresentsInt(timewindow):
-            timewindow=int(timewindow)
-            break
-        else:
-            print 'Try again'
-    while True:
-        wall_end=input('Set max frames for wall setting: ')
-        if RepresentsInt(wall_end):
-            break
-        else:
-            print 'Try again'
-    while True:
-        range_limit=input('Set maximum scan range: ')
-        if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
-            break
-        else:
-            print 'Try again'
-   
+    timewindow = arg_list[1]
+    if not RepresentsInt(arg_list[1]):
+        while True:
+            timewindow = raw_input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                #print timewindow
+                timewindow = int(timewindow)
+                break
+            else:
+                print 'Try again'
+        
+    print 'Timewindow : {0}'.format(timewindow)
+        
+    wall_end = int(arg_list[2])
+    if not RepresentsInt(wall_end):
+        while True:
+            wall_end = raw_input('Set max frames for wall setting: ')
+            if RepresentsInt(wall_end):
+                wall_end = int(wall_end)
+                break
+            else:
+                print 'Try again'
+    print "Wall frames : {0}".format(wall_end)
+
+    range_limit = float(arg_list[3])
+    if not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
+        while True:
+            range_limit = raw_input('Set maximum scan range :')
+            if not (RepresentsFloat(range_limit) or RepresentsFloat(range_limit)):
+                range_limit = float(range_limit)
+                break
+            else:
+                print 'Try again'
+    print "Max Range : {0}".format(range_limit)
+    
+    filename = str(arg_list[4])
+    if not os.path.isfile(filename):
+        while True :
+            try:
+                filename=raw_input('Enter data file name: ')
+                if os.path.isfile(filename):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+    print "File : {0}".format(filename)
+    
+    time.sleep(100)
+            
+def offline_train():
+    global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
+    global z, z_scale, slot_count, human_l ,cluster_l,slot_touched,all_scans
+    global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename, wall_end, range_limit
+    print 'Timewindow before check',timewindow
+    if (len(sys.argv)==5):
+        check_args(sys.argv)
+    else:
+        while True:
+            timewindow=raw_input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                timewindow=int(timewindow)
+                break
+            else:
+                print 'Try again'
+        while True:
+            wall_end=input('Set max frames for wall setting: ')
+            if RepresentsInt(wall_end):
+                break
+            else:
+                print 'Try again'
+        while True:
+            range_limit=input('Set maximum scan range: ')
+            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+                break
+            else:
+                print 'Try again'
+                
+        
+        while True :
+            try:
+                filename=raw_input('Enter data file name: ')
+                if os.path.isfile(filename):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+    
     fr_index=0
     z_scale= float(5*timewindow) / float(3600)
     z=-z_scale
-
-    while True :
-        try:
-            filename=raw_input('Enter data file name: ')
-            if os.path.isfile(filename):
-                break
-            else:
-                print 'File does not exist! Try again!'
-        except SyntaxError:
-            print 'Try again'
     mat=sio.loadmat(filename)
     all_data=mat.get('ranges')
     angle_min=mat.get('angle_min')
@@ -97,6 +160,7 @@ def offline_train():
     max_index=len(all_data)
     mybuffer=all_data[0]
 
+    
     #limit=((max_index-wall_end-120)/timewindow) #epitrepo 3 s kena
     limit=(max_index-wall_end-(3*int(timewindow)))/timewindow #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
@@ -192,15 +256,15 @@ def offline_train():
                             human_l=np.hstack((human_l,human))
                             annotations=np.hstack((annotations,ann))
                     
-                    if slot_count==limit :
+                    if slot_count==limit-1 :
                         build_classifier(np.array(all_hogs),np.array(annotations))
                         save_data()
                         exit()
                     if slot_count>limit:
                         print 'EXITING'
                         exit()
-                          
-                          
+                        
+                        
     build_classifier(np.array(all_hogs),np.array(annotations))
     save_data()
     #exit()
@@ -279,7 +343,7 @@ def cluster_train(clear_data):
 
 def build_classifier(traindata, annotations):
     global timewindow
-	#------------   BUILD CLASSIFIERS -------------
+    #------------   BUILD CLASSIFIERS -------------
     '''
     print 'preparing classifiers ...'
     pickle.dump(wall, open("wall.p","wb+"))
@@ -293,7 +357,7 @@ def build_classifier(traindata, annotations):
     gaussian_nb.fit(temp,annotations)
     pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
     '''
-    print 'preparing classifiers ...'
+    print 'Preparing classifiers ...'
     pickle.dump(wall, open(filename.replace(' ', '')[:-4]+"wall.p","wb+"))
     pickle.dump(traindata, open(filename.replace(' ', '')[:-4]+"traindata.p","wb+"))
     pickle.dump(annotations, open(filename.replace(' ', '')[:-4]+"annotations.p","wb+"))
@@ -303,23 +367,23 @@ def build_classifier(traindata, annotations):
     pickle.dump(temp , open( filename.replace(' ', '')[:-4]+"z_score.p", "wb+" ))
     #exit()
     if os.path.exists("Gaussian_NB_classifier.p"):
-		gaussian_nb = pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
-		gaussian_nb.fit(temp,annotations)
-		pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
-		pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
+        gaussian_nb = pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
+        gaussian_nb.fit(temp,annotations)
+        pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
+        pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
     else:
         gaussian_nb=GaussianNB()
         gaussian_nb.fit(temp,annotations)
         pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
         pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
-		
+        
 
 def save_data():
     global wall,slot_data,all_scans,cluster_l,timewindow,phi,all_hogs
 
         #------------   SAVE DATA ----------------
 
-    print 'saving data ...'
+    print 'Saving data ...'
     b={}
     b['wall_ranges']=wall
     b['timewindow']=slot_data #slot number of each point
