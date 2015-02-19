@@ -25,6 +25,7 @@ c)Test on live data with hpr.py:
 	Publish laser scans on topic /scan, enable intensities, set min_angle, max_angle to -45,45 degrees
 	respectively (to be changed).
 	
+d)You can automatically train with multiple annotations with update_classifier.py. Provide the folder containing the .p files as a command_line argument
 
 RECOMMENDATION:
 
