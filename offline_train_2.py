@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
-#import time
+import time
 from mytools import princomp,dbscan
 from myhog import hog
 from scipy import special
@@ -25,7 +25,7 @@ ccnames =['GRAY', 'BLACK', 'VIOLET', 'BLUE', 'CYAN', 'ROSY', 'ORANGE', 'RED', 'G
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
 
 fr_index=0
-z_scale= float(5*40) / float(3600)
+z_scale= float(5*25) / float(3600)
 z=-z_scale
 slot_count=0
 
@@ -60,7 +60,7 @@ def check_args(arg_list):
     global timewindow, range_limit, wall_end, filename
     print (arg_list)
     
-    timewindow = arg_list[1]
+    timewindow = int(arg_list[1])
     if not RepresentsInt(arg_list[1]):
         while True:
             timewindow = raw_input('Set timewindow in frames: ')
@@ -72,7 +72,6 @@ def check_args(arg_list):
                 print 'Try again'
         
     print 'Timewindow : {0}'.format(timewindow)
-        
     wall_end = int(arg_list[2])
     if not RepresentsInt(wall_end):
         while True:
@@ -108,7 +107,7 @@ def check_args(arg_list):
                 print 'Try again'
     print "File : {0}".format(filename)
     
-    time.sleep(100)
+    #time.sleep(100)
             
 def offline_train():
     global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
@@ -150,7 +149,7 @@ def offline_train():
                 print 'Try again'
     
     fr_index=0
-    z_scale= float(5*timewindow) / float(3600)
+    #z_scale= float(5*25)/float(3600)
     z=-z_scale
     mat=sio.loadmat(filename)
     all_data=mat.get('ranges')
@@ -162,7 +161,7 @@ def offline_train():
 
     
     #limit=((max_index-wall_end-120)/timewindow) #epitrepo 3 s kena
-    limit=(max_index-wall_end-(3*int(timewindow)))/timewindow #allocate at least 3 tw to detect wall
+    limit=(max_index-wall_end-(3*int(timewindow)))/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
     
     #print 'Reduce points by 2? 1/0'
