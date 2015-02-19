@@ -20,6 +20,8 @@ Either provide command line arguments with the same order as below, or run the s
 	!!!When asked for max laser range, input the maximum range scanned 
 	during the recording, not the maximum range at which you want to train
 
+	$python offline_train_2.py <time_window> <wall_set_frames> <max_scan_range> <mat_file_to_use>
+	
 c)Test on live data with hpr.py:
 
 	Publish laser scans on topic /scan, enable intensities, set min_angle, max_angle to -45,45 degrees
@@ -27,7 +29,7 @@ c)Test on live data with hpr.py:
 	
 d)You can automatically train with multiple annotations with update_classifier.py. Provide the folder containing the .p files as a command_line argument
 
-	$update_classifier <folder_name>
+	$python update_classifier <folder_name>
 
 RECOMMENDATION:
 
