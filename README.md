@@ -27,6 +27,8 @@ c)Test on live data with hpr.py:
 	
 d)You can automatically train with multiple annotations with update_classifier.py. Provide the folder containing the .p files as a command_line argument
 
+	$update_classifier <folder_name>
+
 RECOMMENDATION:
 
 	Use same timewindow, and wall set time for each training set, and use the same values when
