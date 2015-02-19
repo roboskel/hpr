@@ -16,7 +16,9 @@ Either provide command line arguments with the same order as below, or run the s
 	*Enter max range scanned (float)
 	
 	*Enter filename (string, no quotes)
+	
 	trained data will be saved as : <input>.<trainingdata>
+	
 	!!!When asked for max laser range, input the maximum range scanned 
 	during the recording, not the maximum range at which you want to train
 
