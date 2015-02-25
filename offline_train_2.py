@@ -322,6 +322,15 @@ def cluster_train(clear_data):
             plt.pause(0.0001)
             #print ccnames[k-1],' cluster size :',len(filter[0]), 'Is',ccnames[k-1],'human? '
             print ccnames[k%12],' cluster size :',len(filter[0]), 'Is',ccnames[k%12],'human? '
+            while True:
+                ha = raw_input()
+                if RepresentsInt(timewindow) and (int(ha)==1 or int(ha)==0):
+                    #print timewindow
+                    ha = int(ha)
+                    break
+                else:
+                    print 'Try again, 1 for human or 0 for obstacle'
+            '''
             while True :
                 try:
                     ha=input()
@@ -329,7 +338,7 @@ def cluster_train(clear_data):
                 except SyntaxError:
                     print 'Try again'
                     print ccnames[k%12],' cluster size :',len(filter[0]), 'Is',ccnames[k%12],'human? '
-
+            '''
             grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
             grid=grid-np.amin(grid) #build surface grid
             surfaces.append(grid)
@@ -393,7 +402,8 @@ def save_data():
     b['rad_angles']=phi
     b['hogs']=all_hogs
     b['surfaces']=all_surf
-    sio.savemat('training_data',b)
+    #sio.savemat('training_data',b)
+    sio.savemat(filename[:-4]+'_training',b);
     print 'done saving'
 
 
