@@ -1,11 +1,11 @@
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans
 
-a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
+#a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
 
 	Enter desired destination with file ending in .mat
 
-b)Annotate with annotate.py (offline_train is no longer used):
+#b)Annotate with annotate.py (offline_train is no longer used):
 
 Either provide command line arguments with the same order as below, or run the script without arguments and provide them when prompted
 
@@ -24,13 +24,13 @@ Either provide command line arguments with the same order as below, or run the s
 
 	$python annotate.py <time_window> <wall_set_frames> <max_scan_range> <mat_file_to_use>
 
-c)create classifier with merge_train.py:
+#c)create classifier with merge_train.py:
 
 merge_train will create a classifier in the specified folder
 
 	$python merge_train <folder of annotated .mat files>
 	
-d)Test on live data with hpr.py:
+#d)Test on live data with hpr.py:
 
 	Publish laser scans on topic /scan, enable intensities, set min_angle, max_angle to -45,45 degrees
 	respectively (to be changed).
