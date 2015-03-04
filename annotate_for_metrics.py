@@ -27,14 +27,14 @@ cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g',
 fr_index=0
 dt = 25;#period in ms (dt between scans)
 speed = 5;#human walking speed in km/h
-z_scale= float(speed*dt) / float(3600)#time to space transform
+z_scale= float(speed*dt) / float(3600)
 z=-z_scale
 slot_count=0
 
 slot_touched=0
 
 flag=0
-plt.ion()#plot Interactive mode ON
+plt.ion()
 wall_flag=0
 wall_index=1
 em_index=0
@@ -42,8 +42,11 @@ timewindow=40#timewindow in frames (40 is just an initialization)
 filename=''
 wall_end = 0
 range_limit = 0
-gridfit_density_x = 16
-gridfit_density_y = 16
+annotations_checked = 0
+TP = 0
+TN = 0
+FP = 0
+FN = 0
 
 def RepresentsInt(s):
     try: 
@@ -63,42 +66,7 @@ def RepresentsFloat(s):
 def check_args(arg_list):
     global timewindow, range_limit, wall_end, filename
     print (arg_list)
-    
-    timewindow = int(arg_list[1])
-    if not RepresentsInt(arg_list[1]):
-        while True:
-            timewindow = raw_input('Set timewindow in frames: ')
-            if RepresentsInt(timewindow):
-                #print timewindow
-                timewindow = int(timewindow)
-                break
-            else:
-                print 'Try again'
-        
-    print 'Timewindow : {0}'.format(timewindow)
-    wall_end = int(arg_list[2])
-    if not RepresentsInt(wall_end):
-        while True:
-            wall_end = raw_input('Set max frames for wall setting: ')
-            if RepresentsInt(wall_end):
-                wall_end = int(wall_end)
-                break
-            else:
-                print 'Try again'
-    print "Wall frames : {0}".format(wall_end)
-
-    range_limit = float(arg_list[3])
-    if not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
-        while True:
-            range_limit = raw_input('Set maximum scan range :')
-            if not (RepresentsFloat(range_limit) or RepresentsFloat(range_limit)):
-                range_limit = float(range_limit)
-                break
-            else:
-                print 'Try again'
-    print "Max Range : {0}".format(range_limit)
-    
-    filename = str(arg_list[4])
+    filename = str(arg_list[1])
     if not os.path.isfile(filename):
         while True :
             try:
@@ -113,37 +81,15 @@ def check_args(arg_list):
     
     #time.sleep(100)
             
-def offline_train():
+def annotate_for_metrics():
     global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
     global z, z_scale, slot_count, human_l ,cluster_l,slot_touched,all_scans
     global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename, wall_end, range_limit
+    global classifier_annotations
     print 'Timewindow before check',timewindow
-    if (len(sys.argv)==5):
+    if (len(sys.argv)==2):
         check_args(sys.argv)
-    else:
-        print 'Non-interactive if executed as follows:'
-        print 'annotate.py <timewindow in frames> <max_frames> <max_range> <file_to_be_saved>'
-        while True:
-            timewindow=raw_input('Set timewindow in frames: ')
-            if RepresentsInt(timewindow):
-                timewindow=int(timewindow)
-                break
-            else:
-                print 'Try again'
-        while True:
-            wall_end=input('Set max scans for wall setting: ')
-            if RepresentsInt(wall_end):
-                break
-            else:
-                print 'Try again'
-        while True:
-            range_limit=input('Set maximum scan range: ')
-            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
-                break
-            else:
-                print 'Try again'
-                
-        
+    else:        
         while True :
             try:
                 filename=raw_input('Enter data file name: ')
@@ -162,44 +108,36 @@ def offline_train():
     angle_min=mat.get('angle_min')
     angle_max=mat.get('angle_max')
     angle_increment=mat.get('angle_increment')
+    timewindow = mat.get('timewindow')
+    range_limit = mat.get('range_limit')
+    classifier_annotations = mat.get('annotations')
     max_index=len(all_data)
     mybuffer=all_data[0]
 
-    
-    #limit=((max_index-wall_end-120)/timewindow) #epitrepo 3 s kena
-    #TODO change name
-    #number of frames of size <timewindow> scans
-    limit=(max_index-wall_end-(3*int(timewindow)))/int(timewindow) #allocate at least 3*timewindow to detect wall
+    limit=max_index/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
     
-    #TODO step 2
     sampling=np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
-    
-    #sort scans
     phi=np.arange(angle_min,angle_max,angle_increment)[sampling]
-    wall=all_data[0]
-
-    for wall_index in range(1,wall_end):
-
-        print 'Wall_index : {0}'.format(wall_index)
-        #wall=all_data[0]
-        filter=np.where(wall>=range_limit)
-        wall[filter]=range_limit
-
-        if (wall_index<wall_end):
-            mybuffer=np.vstack((mybuffer,wall ))
-
-    mybuffer=mybuffer[:,sampling]
-
-    wall=np.min(mybuffer, axis=0)-0.1 #select min of measurements
-    print "Wall index : {0}".format(wall_index)
-    #print "Wall : {0}".format(wall)
+    
+    
+    wall = mat.get('wall')#we have the wall from the mat!
+    wall2 = np.zeros(len(wall)/2)
+    #wall.shape(len(wall)+2,1)
+    #wall = np.array(wall)
+    for i in range(len(wall)-1):
+        if i%2 == 0:
+            wall2[i/2] += (wall[i][0])
+    print wall2
+    wall = wall2
+    #exit()
+    
     wall_cart=np.array(pol2cart(wall,phi,0) )[:,0:2] #convert to Cartesian
     kat,ax=initialize_plots(wall_cart)
 
     print 'Walls set...'
     
-    for outer_index in range(wall_index,max_index):
+    for outer_index in range(0,max_index):
 
         print 'outer_index : {0}'.format(outer_index)
         raw_data=all_data[outer_index]
@@ -234,10 +172,11 @@ def offline_train():
                 
                 print 'empty scans: {0}'.format(em_index)
                 cluster_labels,human,hogs,ann,surfaces=cluster_train(mybuffer) #clustering
-
+                print ann
                 if len(hogs)!=0:
                     print'len(hogs)!=0'
                     slot_count=slot_count+1
+                    '''
                     print 'File : {0}'.format(filename)
                     print 'slot count : {0} || limit :{1}'.format(slot_count, limit)
                     ha=np.array(slot_count*np.ones(len(mybuffer))) #data point -> slot_number
@@ -259,18 +198,21 @@ def offline_train():
                             cluster_l=np.hstack((cluster_l,cluster_labels))
                             human_l=np.hstack((human_l,human))
                             annotations=np.hstack((annotations,ann))
-                    
-                    if slot_count==limit-1 :
-                        build_classifier(np.array(all_hogs),np.array(annotations))
-                        save_data()
-                        exit()
+                    '''
+                   # if slot_count==limit-1 :
+                        #exit()
                     if slot_count>limit:
                         print 'EXITING'
-                        exit()
-                        
-                        
-    build_classifier(np.array(all_hogs),np.array(annotations))
-    save_data()
+                        #exit()
+    if FP+TN > 0:    
+        print 'Precision'
+        print float(float(TP)/float(FP+TN))
+    if TP+FN > 0:
+        print 'Recall'
+        print float(float(TP)/float(TP+FN))
+    if TP+FP+TN+FN > 0:
+        print 'Accuracy'
+        print float(float(TP+TN)/float(TP+FP+TN+FN))
     #exit()
 
 
@@ -288,7 +230,7 @@ def initialize_plots(wall_cart):
     plot2d = temp.add_subplot(111)
     plot2d.set_xlabel('Vertical distance')
     plot2d.set_ylabel('Robot is here')
-    plot2d.plot(wall_cart[:,0],wall_cart[:,1])
+   # plot2d.plot(wall_cart[:,0],wall_cart[:,1])
 
     fig1=plt.figure()
     plot3d= fig1.gca(projection='3d')
@@ -299,9 +241,9 @@ def initialize_plots(wall_cart):
     
     return plot2d,plot3d
 
-def cluster_train(clear_data):
+def cluster_train(clear_data):#TODO edw mesa tha prepei na elegxw ta annotations!
 
-    global cc, ccnames, kat, ax, fig1, wall_cart, gridfit_density_x, gridfit_density_y
+    global cc, ccnames, kat, ax, fig1, wall_cart, TP, FP, TN, FN, annotations_checked
     hogs=[]
     surfaces=[]
     ann=[]
@@ -336,7 +278,36 @@ def cluster_train(clear_data):
                 else:
                     print 'Try again, 1 for human or 0 for obstacle'
                     
-            grid=gridfit(yi[filter], zi[filter], xi[filter], gridfit_density_x, gridfit_density_y) #extract surface
+            if ha == classifier_annotations[annotations_checked]:
+                if ha == 1:
+                    TP+=1
+                    print 'TP'
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                    print TP
+                else:
+                    TN+=1
+                    print 'TN'
+                    print TN
+            else:
+                if classifier_annotations[annotations_checked] == 1:
+                    FP+=1
+                    print 'FP'
+                    print FP
+                else:
+                    FN+=1
+                    print 'FN'
+                    print FN
+            annotations_checked+=1
+            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
             grid=grid-np.amin(grid) #build surface grid
             surfaces.append(grid)
             hogs.append(hog(grid)) #extract features
@@ -345,44 +316,5 @@ def cluster_train(clear_data):
 
     return cluster_labels,human,hogs,ann,surfaces
 
-
-def build_classifier(traindata, annotations):
-    global timewindow
-    #------------   BUILD CLASSIFIERS -------------
-    
-    
-    print 'Preparing classifiers ...'
-    pickle.dump(wall, open(filename.replace(' ', '')[:-4]+"wall.p","wb+"))
-    pickle.dump(traindata, open(filename.replace(' ', '')[:-4]+"traindata.p","wb+"))
-    pickle.dump(annotations, open(filename.replace(' ', '')[:-4]+"annotations.p","wb+"))
-    pickle.dump(timewindow, open(filename.replace(' ', '')[:-4]+"timewindow.p","wb+"))
-    #Apply PCA z score
-    temp=zscore(traindata)
-    pickle.dump(temp , open( filename.replace(' ', '')[:-4]+"z_score.p", "wb+" ))
-    gaussian_nb = GaussianNB()
-    gaussian_nb.fit(temp,annotations)
-    pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )    
-
-def save_data():
-    global wall,slot_data,all_scans,cluster_l,timewindow,phi,all_hogs
-
-        #------------   SAVE DATA ----------------
-
-    print 'Saving data ...'
-    b={}
-    b['wall_ranges']=wall
-    b['timewindow']=slot_data #slot number of each point
-    b['cluster_cartesians']=all_scans #cartesian coordinates of cluster points
-    b['human_labels']=human_l #annotations of cluster points
-    b['cluster_labels']=cluster_l
-    b['timewindow']=timewindow
-    b['rad_angles']=phi
-    b['hogs']=all_hogs
-    b['surfaces']=all_surf
-    #sio.savemat('training_data',b)
-    sio.savemat(filename[:-4]+'_training',b);
-    print 'done saving'
-
-
 if __name__ == '__main__':
-    offline_train()
+    annotate_for_metrics()

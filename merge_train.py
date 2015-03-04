@@ -10,6 +10,7 @@ import time
 from os import listdir
 from os.path import isfile, join, splitext
 from scipy.stats.mstats import zscore
+from sklearn.decomposition import PCA
 np.set_printoptions(threshold='nan')
 
 
@@ -56,8 +57,10 @@ def DisplayClassifier():
     pickle.dump(ann_files, open(path+"annotations_merged.p","wb+"))
     temp=zscore(t_files)
     gaussian_nb=GaussianNB()
-    #gaussian_nb.fit(temp,ann_files)
-    gaussian_nb.fit(t_files,ann_files)
+    pca = PCA()
+    pca.fit(temp)
+    gaussian_nb.fit(temp,ann_files)
+    #gaussian_nb.fit(t_files,ann_files)
     pickle.dump( gaussian_nb, open(path+"Gaussian_NB_classifier_merged.p", "wb+" ) )
     print gaussian_nb.class_prior_
     raw_input("Press any key to exit")
