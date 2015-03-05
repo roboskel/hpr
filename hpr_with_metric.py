@@ -16,6 +16,8 @@ from myhog import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 
+from sklearn.decomposition import PCA
+
 ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
 wall_flag=0
@@ -30,9 +32,12 @@ classification_array = []
 scan_received = 0
 plt.ion()
 class_path = ''
+pca_path = ''
+pca_obj = PCA()
 annotation_file = ''
 first_time = True
 first_time_ranges = True
+sub_topic = 'scan'
 
 def RepresentsInt(s):
     try: 
@@ -80,24 +85,49 @@ def Calculate_Metrics(annotated_data):
     return
             
 def laser_listener():
-    global class_path
-    class_path = str(sys.argv[1])
+    #ADDITIONS command line inputs klp
+    print "###################################"
+    print "For non interactive input run as follows : "
+    print "rosrun <package_name> hpr.py <classifier object path> <pca objec path> <laserscan topic> <timewindow in frames> <maximum scan range>"
+    print "##################################"
+    #ADDITIONS
+    
+    global class_path, pca_path, sub_topic, timewindow, range_limit
     global annotations
-    '''
-    global annotation_file
-    annotation_file = str(sys.argv[2])
+    print sys.argv
+    
+    #ADDITIONS command line inputs klp
+    if len(sys.argv)>=3:
+        class_path = str(sys.argv[1])
+        pca_path = str(sys.argv[2])
+        print class_path
+        print pca_path
     
     if not os.path.isfile(class_path):
         while True :
             try:
-                class_path=raw_input('Enter classifier file name: ')
+                class_path=raw_input('Enter classifier object file path: ')
                 if os.path.isfile(class_path):
                     break
                 else:
                     print 'File does not exist! Try again!'
             except SyntaxError:
                 print 'Try again'
-    print "File : {0}".format(class_path)
+    print "Classifier File : {0}".format(class_path)
+    
+    if not os.path.isfile(pca_path):
+        while True :
+            try:
+                pca_path=raw_input('Enter pca object file path: ')
+                if os.path.isfile(pca_path):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+    print "File : {0}".format(pca_path)
+    #ADDITIONS command line inputs klp
+    '''
     if not os.path.isfile(annotation_file):
         while True :
             try:
@@ -110,24 +140,48 @@ def laser_listener():
                 print 'Try again'
     print "File : {0}".format(annotation_file)
     '''
-    global scan_received
     global timewindow, range_limit, annotated_data, classification_array
     rospy.init_node('laser_listener', anonymous=True)
-    sub_topic = "scan"
-    while True:
-        timewindow=input('Set timewindow in frames: ')
-        if RepresentsInt(timewindow):
-            break
-        else:
-            print 'Try again'
-    while True:
-        range_limit=input('Set maximum scan range: ')
-        if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
-            break
-        else:
-            print 'Try again'
+    #ADDITIONS command line inputs klp
+    if len(sys.argv)==6:
+        scan_topic = str(sys.argv[3])
+        timewindow = int(sys.argv[4])
+        while not RepresentsInt(timewindow):
+            timewindow=input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+        range_limit = float(sys.argv[5])
+        while not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
+            range_limit=input('Set maximum scan range in m: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+    else:
+        sub_topic = "scan"
+        while True:
+            timewindow=input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+        while True:
+            range_limit=input('Set maximum scan range: ')
+            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+                break
+            else:
+                print 'Try again'
    
-    print('Subscribing to: %s' % sub_topic)
+    print "Classifier object path : ", class_path 
+    print "PCA object path : ", pca_path
+    print "Scan Topic : ", sub_topic
+    print "Timewindow (frames) : ",timewindow
+    print "Maximum scan range (meters)", range_limit
+    print "Waiting for laser scans ..."
+    #ADDITIONS command line inputs klp
+    
     rospy.Subscriber(sub_topic,LaserScan,online_test)
     scan_received=rospy.Time.now().to_sec()
     while not rospy.is_shutdown():  
@@ -157,7 +211,7 @@ def laser_listener():
 def online_test(laser_data):
     global wall_flag , wall , fr_index ,  intens ,w_index,phi,sampling
     global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1, kat
-    global scan_received
+    global pca_obj
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges
     scan_received = rospy.Time.now().to_sec()
     #print scan_received
@@ -170,8 +224,13 @@ def online_test(laser_data):
             sampling=np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
             #else :
             #    sampling=np.arange(0,len(np.array(laser_data.ranges)),1)
-            R,intens,F,gaussian=loadfiles()
+            #R,intens,F,gaussian=loadfiles()
+            
+            #ADDITIONS allaksa na mhn epistrefei ta asxeta poy den xrhsimopoioyntai
+            gaussian, pca_obj = loadfiles()
             wall=np.array(laser_data.ranges)
+            #ADDITIONS
+            
             mybuffer=wall
             filter=np.where(wall>=range_limit)
             wall[filter]=range_limit
@@ -245,23 +304,28 @@ def pol2cart(r,theta,zed):
     return C
 
 def loadfiles():
-    global class_path
-    #Load intensity-range-angle data and classifier
-    mat=sio.loadmat('ideal_data.mat')
-    ranges=mat.get('ranges')
-    intensities=mat.get('intensities')
-    angle_min=mat.get('angle_min')
-    angle_max=mat.get('angle_max')
-    angle_increment=mat.get('angle_increment')
-    theta=np.arange(angle_min,angle_max,angle_increment)
-
-    #classifier_ilithiou = pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
-    #print class_path
-    classifier = pickle.load( open( class_path, "rb" ) )
     
-    print classifier.class_prior
+    #ADDITIONS
+    global class_path
+    global pca_path
+    #ADDITIONS
+    
+    #ADDITIONS ta apokatw htan ayta ta axrista poy fortonontousan
+    #Load intensity-range-angle data and classifier
+    #mat=sio.loadmat('ideal_data.mat')
+    #ranges=mat.get('ranges')
+    #intensities=mat.get('intensities')
+    #angle_min=mat.get('angle_min')
+    #angle_max=mat.get('angle_max')
+    #angle_increment=mat.get('angle_increment')
+    #theta=np.arange(angle_min,angle_max,angle_increment)
+    
+    classifier = pickle.load( open( class_path, "rb" ) )
+    pca_obj = pickle.load(open ( pca_path, "rb"))
+    
     #print classifier_ilithiou.class_prior
-    return ranges,intensities,theta,classifier
+    #return ranges,intensities,theta,classifier
+    return classifier, pca_obj
 
 def initialize_plots(wall_cart):
     global fig1
@@ -335,14 +399,16 @@ def scatter_all(xi,yi,zi,cluster_labels):
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
-    global kat, fig1, ax, wall_cart, gaussian, counter, classification_array
+    global kat, fig1, ax, wall_cart, gaussian, counter, classification_array, pca_obj
     global annotations, first_time
     temp=[]
     if flag==1:
         kat.clear()
         kat.plot(wall_cart[:,0],wall_cart[:,1])
         if np.array(hogs).shape==(1,36):
-            temp=zscore(np.array(hogs)[0])
+            temp = zscore(np.array(hogs)[0])
+            #ADDITIONS EDW KANW TRANSFORM KAI META PAEI APO KATW STO CLASSIFICATION
+            temp = pca_obj.transform(temp)
         else:
             for i in range(0,len(hogs)):
                 temp.append(zscore(np.array(hogs[i])))

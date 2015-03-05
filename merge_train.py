@@ -24,6 +24,11 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 def DisplayClassifier():
     t_files_set = False
     path=''
+    print "##########################################################"
+    print "Run with no arguments to train with data located in current folder"
+    print "To specifiy the location of the training data run as follows :"
+    print ">python <path of folder of training data>"
+    print "##########################################################"
     if (len(sys.argv)==2):
         path = sys.argv[1]
     try:
@@ -55,14 +60,22 @@ def DisplayClassifier():
                 t_files = pickle.load( open( path+file_, "rb" ) )
     pickle.dump(t_files, open(path+"traindata_merged.p","wb+"))
     pickle.dump(ann_files, open(path+"annotations_merged.p","wb+"))
-    temp=zscore(t_files)
+    
+    #Create z-scored data
+    temp = zscore(t_files)
+    
+    #create classifier object
     gaussian_nb=GaussianNB()
+        
+    #Create PCA object
     pca = PCA()
     pca.fit(temp)
-    gaussian_nb.fit(temp,ann_files)
-    #gaussian_nb.fit(t_files,ann_files)
+    temp = pca.fit_transform(temp)
+    gaussian_nb.fit(temp, ann_files)
+    
     pickle.dump( gaussian_nb, open(path+"Gaussian_NB_classifier_merged.p", "wb+" ) )
-    print gaussian_nb.class_prior_
+    pickle.dump( pca, open(path+"PCA_object.p", "wb+"))
+    
     raw_input("Press any key to exit")
 
 
