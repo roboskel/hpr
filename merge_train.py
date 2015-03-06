@@ -43,6 +43,11 @@ def DisplayClassifier():
         os.remove(path+"Gaussian_NB_classifier_merged.p")
     except OSError:
         pass
+    try:
+        os.remove(path+"PCA_object.p")
+    except OSError:
+        pass
+    
     onlyfiles = [ f for f in listdir(path) if isfile(join(path,f)) ]
     onlyfiles.sort()
     #print onlyfiles
@@ -70,7 +75,7 @@ def DisplayClassifier():
     #Create PCA object
     pca = PCA()
     pca.fit(temp)
-    temp = pca.fit_transform(temp)
+    temp = pca.transform(temp)
     gaussian_nb.fit(temp, ann_files)
     
     pickle.dump( gaussian_nb, open(path+"Gaussian_NB_classifier_merged.p", "wb+" ) )
