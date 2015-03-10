@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 __author__="athanasia sapountzi"
-#python annotate.py <time_window> <wall_set_frames> <max_scan_range> <mat_file_to_use>
+
 import  pickle
 import os.path
 import sys
@@ -13,6 +13,8 @@ from myhog import hog
 from scipy import special
 from scipy.stats.mstats import zscore
 from gridfit import gridfit
+from numpy import loadtxt
+from matplotlib import cm
 
 
 #pre-made classifiers
@@ -25,25 +27,21 @@ ccnames =['GRAY', 'BLACK', 'VIOLET', 'BLUE', 'CYAN', 'ROSY', 'ORANGE', 'RED', 'G
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
 
 fr_index=0
-dt = 25;#period in ms (dt between scans)
-speed = 5;#human walking speed in km/h
-z_scale= float(speed*dt) / float(3600)#time to space transform
+z_scale= float(5*25) / float(3600)
 z=-z_scale
 slot_count=0
 
 slot_touched=0
 
 flag=0
-plt.ion()#plot Interactive mode ON
+plt.ion()
 wall_flag=0
 wall_index=1
 em_index=0
-timewindow=40#timewindow in frames (40 is just an initialization)
+timewindow=40
 filename=''
 wall_end = 0
 range_limit = 0
-gridfit_density_x = 16
-gridfit_density_y = 16
 
 def RepresentsInt(s):
     try: 
@@ -61,9 +59,8 @@ def RepresentsFloat(s):
         
         
 def check_args(arg_list):
-    global timewindow, range_limit, wall_end, filename
-    print (arg_list)
-    
+    global timewindow, wall_end, filename
+    print "Arguments given : {0}".format(str(sys.argv))
     timewindow = int(arg_list[1])
     if not RepresentsInt(arg_list[1]):
         while True:
@@ -75,7 +72,7 @@ def check_args(arg_list):
             else:
                 print 'Try again'
         
-    print 'Timewindow : {0}'.format(timewindow)
+    
     wall_end = int(arg_list[2])
     if not RepresentsInt(wall_end):
         while True:
@@ -85,20 +82,9 @@ def check_args(arg_list):
                 break
             else:
                 print 'Try again'
-    print "Wall frames : {0}".format(wall_end)
-
-    range_limit = float(arg_list[3])
-    if not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
-        while True:
-            range_limit = raw_input('Set maximum scan range :')
-            if not (RepresentsFloat(range_limit) or RepresentsFloat(range_limit)):
-                range_limit = float(range_limit)
-                break
-            else:
-                print 'Try again'
-    print "Max Range : {0}".format(range_limit)
+                    
+    filename = str(arg_list[3])
     
-    filename = str(arg_list[4])
     if not os.path.isfile(filename):
         while True :
             try:
@@ -109,20 +95,62 @@ def check_args(arg_list):
                     print 'File does not exist! Try again!'
             except SyntaxError:
                 print 'Try again'
+                
     print "File : {0}".format(filename)
-    
-    #time.sleep(100)
+    print "Wall frames : {0}".format(wall_end)
+    print 'Timewindow : {0}'.format(timewindow)
             
 def offline_train():
+    print "xXxMLG_OFFLINE_TRAIN_NOSCOPExXx"
+    print "#######################"
+    print "Non interactive train :"
+    print "python annotate.py <timewindow> <wall_frames> <maximum_scan_range> <data_file_name>"
+    print "You gave {0} arguments".format(len(sys.argv))
+    print "#######################"
+    
     global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
     global z, z_scale, slot_count, human_l ,cluster_l,slot_touched,all_scans
     global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename, wall_end, range_limit
-    print 'Timewindow before check',timewindow
-    if (len(sys.argv)==5):
+
+    if (len(sys.argv)==4):
+        #FULL ARGUMENTS GIVEN
         check_args(sys.argv)
+        mat = sio.loadmat(filename)
+        all_data = mat.get('ranges')
+        range_limit = np.max(all_data)
+        print "Maximum scan Range : {0}".format(range_limit)
+        angle_min = mat.get('angle_min')
+        angle_max = mat.get('angle_max')
+        angle_increment = mat.get('angle_increment')
+        max_index = len(all_data)
+    elif (len(sys.argv)==2):
+        print "READING LEGACY .TXT"
+        #READ ONLY LEGACY TXT
+        filename = sys.argv[1]
+        while not os.path.isfile(filename) :
+            try:
+                filename = raw_input('Enter data file name: ')
+                if os.path.isfile(filename):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+        #lines = loadtxt(filename, comments="#", delimiter=" ", unpack=False)
+        test_array=[]
+        with open(filename) as f:
+            for line in f:
+                numbers_float = map(float, line.split())
+                test_array.append(numbers_float)
+        z_scale= float(5*40) / float(3600)
+        z=-z_scale
+        all_data = test_array
+        angle_min = -1.74532925
+        angle_max = 1.74532925
+        angle_increment = 0.00872664626
+        max_index = len(all_data)
+        print "READ .TXT"
     else:
-        print 'Non-interactive if executed as follows:'
-        print 'annotate.py <timewindow in frames> <max_frames> <max_range> <file_to_be_saved>'
         while True:
             timewindow=raw_input('Set timewindow in frames: ')
             if RepresentsInt(timewindow):
@@ -131,23 +159,22 @@ def offline_train():
             else:
                 print 'Try again'
         while True:
-            wall_end=input('Set max scans for wall setting: ')
+            wall_end=input('Set max frames for wall setting: ')
             if RepresentsInt(wall_end):
                 break
             else:
                 print 'Try again'
-        while True:
-            range_limit=input('Set maximum scan range: ')
-            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
-                break
-            else:
-                print 'Try again'
-                
-        
         while True :
             try:
                 filename=raw_input('Enter data file name: ')
                 if os.path.isfile(filename):
+                    mat = sio.loadmat(filename)
+                    all_data = mat.get('ranges')
+                    range_limit = np.max(all_data)
+                    angle_min = mat.get('angle_min')
+                    angle_max = mat.get('angle_max')
+                    angle_increment = mat.get('angle_increment')
+                    max_index = len(all_data)
                     break
                 else:
                     print 'File does not exist! Try again!'
@@ -157,25 +184,22 @@ def offline_train():
     fr_index=0
     #z_scale= float(5*25)/float(3600)
     z=-z_scale
-    mat=sio.loadmat(filename)
-    all_data=mat.get('ranges')
-    angle_min=mat.get('angle_min')
-    angle_max=mat.get('angle_max')
-    angle_increment=mat.get('angle_increment')
-    max_index=len(all_data)
+    
     mybuffer=all_data[0]
 
-    
     #limit=((max_index-wall_end-120)/timewindow) #epitrepo 3 s kena
-    #TODO change name
-    #number of frames of size <timewindow> scans
-    limit=(max_index-wall_end-(3*int(timewindow)))/int(timewindow) #allocate at least 3*timewindow to detect wall
+    limit=(max_index-wall_end-(3*int(timewindow)))/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
     
-    #TODO step 2
+    #print 'Reduce points by 2? 1/0'
+    #if input()==1 :
+    
     sampling=np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
     
+    #else :
+       #sampling=np.arange(0,len(mybuffer),1)
     #sort scans
+    
     phi=np.arange(angle_min,angle_max,angle_increment)[sampling]
     wall=all_data[0]
 
@@ -187,13 +211,13 @@ def offline_train():
         wall[filter]=range_limit
 
         if (wall_index<wall_end):
-            mybuffer=np.vstack((mybuffer,wall ))
+            mybuffer=np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 720)
 
     mybuffer=mybuffer[:,sampling]
 
     wall=np.min(mybuffer, axis=0)-0.1 #select min of measurements
     print "Wall index : {0}".format(wall_index)
-    #print "Wall : {0}".format(wall)
+    print "Wall : {0}".format(wall)
     wall_cart=np.array(pol2cart(wall,phi,0) )[:,0:2] #convert to Cartesian
     kat,ax=initialize_plots(wall_cart)
 
@@ -268,7 +292,6 @@ def offline_train():
                         print 'EXITING'
                         exit()
                         
-                        
     build_classifier(np.array(all_hogs),np.array(annotations))
     save_data()
     #exit()
@@ -282,7 +305,7 @@ def pol2cart(r,theta,zed):
     return C
 
 def initialize_plots(wall_cart):
-    global fig1
+    global fig1, fig3
 
     temp=plt.figure()
     plot2d = temp.add_subplot(111)
@@ -297,11 +320,18 @@ def initialize_plots(wall_cart):
     plot3d.set_zlabel('Z - time')
     plt.show()
     
+    fig3=plt.figure('3D Gridfit View')
+    #plot3d= fig3.gca(projection='3d')
+    #plot3d.set_xlabel('X - Distance')
+    #plot3d.set_ylabel('Y - Robot')
+    #plot3d.set_zlabel('Z - time')
+    plt.show()
+    
     return plot2d,plot3d
 
 def cluster_train(clear_data):
 
-    global cc, ccnames, kat, ax, fig1, wall_cart, gridfit_density_x, gridfit_density_y
+    global cc, ccnames, kat, ax, fig1, wall_cart, fig3
     hogs=[]
     surfaces=[]
     ann=[]
@@ -323,8 +353,20 @@ def cluster_train(clear_data):
             ax.scatter(xi[filter],yi[filter], zi[filter], 'z', 30,c=cc[k%12])
             fig1.add_axes(ax)
             #kat.scatter(xi[filter],yi[filter],s=20, c=cc[k-1])
-            kat.scatter(xi[filter],yi[filter],s=20, c=cc[k%12])
+            kat.scatter(xi[filter],yi[filter],s=20, c=cc[k%12]) 
+            
+            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+            grid=grid-np.amin(grid) #build surface grid
+            fig3.clear()
+            ax3 = fig3.add_subplot(1,1,1, projection='3d')
+            X, Y = np.mgrid[:16, :16]
+            surf = ax3.plot_surface(X, Y, grid, rstride=1, cstride=1, cmap=cm.gray,
+                    linewidth=0, antialiased=False)
+            surfaces.append(grid)
+            hogs.append(hog(grid)) #extract features
+            
             plt.pause(0.0001)
+            
             #print ccnames[k-1],' cluster size :',len(filter[0]), 'Is',ccnames[k-1],'human? '
             print ccnames[k%12],' cluster size :',len(filter[0]), 'Is',ccnames[k%12],'human? '
             while True:
@@ -336,10 +378,10 @@ def cluster_train(clear_data):
                 else:
                     print 'Try again, 1 for human or 0 for obstacle'
                     
-            grid=gridfit(yi[filter], zi[filter], xi[filter], gridfit_density_x, gridfit_density_y) #extract surface
-            grid=grid-np.amin(grid) #build surface grid
-            surfaces.append(grid)
-            hogs.append(hog(grid)) #extract features
+            #grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+            #grid=grid-np.amin(grid) #build surface grid
+            #surfaces.append(grid)
+            #hogs.append(hog(grid)) #extract features
             human[filter]=ha
             ann.append(ha)
 
@@ -361,7 +403,19 @@ def build_classifier(traindata, annotations):
     pickle.dump(temp , open( filename.replace(' ', '')[:-4]+"z_score.p", "wb+" ))
     gaussian_nb = GaussianNB()
     gaussian_nb.fit(temp,annotations)
-    pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )    
+    pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
+    ''''
+    if os.path.exists("Gaussian_NB_classifier.p"):
+        gaussian_nb = pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
+        gaussian_nb.fit(temp,annotations)
+        pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
+        pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
+    else:
+        gaussian_nb=GaussianNB()
+        gaussian_nb.fit(temp,annotations)
+        pickle.dump( gaussian_nb, open( "Gaussian_NB_classifier.p", "wb+" ) )
+        pickle.dump( gaussian_nb, open( filename.replace(' ', '')[:-4]+"Gaussian_NB_classifier.p", "wb+" ) )
+    '''    
 
 def save_data():
     global wall,slot_data,all_scans,cluster_l,timewindow,phi,all_hogs
