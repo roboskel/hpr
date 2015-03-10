@@ -17,18 +17,14 @@ Either provide command line arguments with the same order as below, or run the s
 	
 	*Enter frames to set wall (int)
 	
-	*Enter max range scanned (float)
-	
 	*Enter filename (string, no quotes)
 	
 	trained data will be saved as : <input>.<trainingdata>
 	
-	!!!When asked for max laser range, input the maximum range scanned 
-	during the recording, not the maximum range at which you want to train
 
 Command line use:
 
-	$python annotate.py <time_window> <wall_set_frames> <max_scan_range> <mat_file_to_use>
+	$python annotate.py <time_window> <wall_set_frames> <mat_file_to_use>
 
 #c)create classifier with merge_train.py:
 
