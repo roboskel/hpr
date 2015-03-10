@@ -43,6 +43,9 @@ filename=''
 wall_end = 0
 range_limit = 0
 
+annotated_humans = 0
+annotated_obstacles = 0
+
 def RepresentsInt(s):
     try: 
         int(s)
@@ -104,7 +107,7 @@ def offline_train():
     print "xXxMLG_OFFLINE_TRAIN_NOSCOPExXx"
     print "#######################"
     print "Non interactive train :"
-    print "python annotate.py <timewindow> <wall_frames> <maximum_scan_range> <data_file_name>"
+    print "python annotate.py <timewindow> <wall_frames> <data_file_name>"
     print "You gave {0} arguments".format(len(sys.argv))
     print "#######################"
     
@@ -145,6 +148,7 @@ def offline_train():
         z_scale= float(5*40) / float(3600)
         z=-z_scale
         all_data = test_array
+        range_limit = np.max(all_data)
         angle_min = -1.74532925
         angle_max = 1.74532925
         angle_increment = 0.00872664626
@@ -332,6 +336,7 @@ def initialize_plots(wall_cart):
 def cluster_train(clear_data):
 
     global cc, ccnames, kat, ax, fig1, wall_cart, fig3
+    global annotated_humans, annotated_obstacles
     hogs=[]
     surfaces=[]
     ann=[]
@@ -374,6 +379,10 @@ def cluster_train(clear_data):
                 if RepresentsInt(timewindow) and (int(ha)==1 or int(ha)==0):
                     #print timewindow
                     ha = int(ha)
+                    if ha == 1:
+                        annotated_humans = annotated_humans + 1
+                    else :
+                        annotated_obstacles = annotated_obstacles + 1
                     break
                 else:
                     print 'Try again, 1 for human or 0 for obstacle'
@@ -419,7 +428,7 @@ def build_classifier(traindata, annotations):
 
 def save_data():
     global wall,slot_data,all_scans,cluster_l,timewindow,phi,all_hogs
-
+    global annotated_humans, annotated_obstacles
         #------------   SAVE DATA ----------------
 
     print 'Saving data ...'
@@ -433,10 +442,13 @@ def save_data():
     b['rad_angles']=phi
     b['hogs']=all_hogs
     b['surfaces']=all_surf
+    b['number_of_humans']=annotated_humans
+    b['number_of_obstacles']=annotated_obstacles
     #sio.savemat('training_data',b)
     sio.savemat(filename[:-4]+'_training',b);
     print 'done saving'
-
+    print "Annotated Humans : {0}".format(annotated_humans)
+    print "Annotated Obstacles : {0}".format(annotated_obstacles)
 
 if __name__ == '__main__':
     offline_train()
