@@ -8,54 +8,177 @@ import scipy.io as sio
 import scipy.special
 import matplotlib.pyplot as plt
 import mytools as mt #DBSCAN function and perquisites are stored here
+import sys
+import os.path
 
+from os import listdir
+from os.path import isfile, join, splitext
 from myhog import hog
 from scipy.stats.mstats import zscore
-
+from sklearn.decomposition import PCA
+from sklearn.naive_bayes import GaussianNB
 
 ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
-wall_flag=0
-fr_index=1
-z=0
-z_scale= float(5*40) / float(3600)
-w_index=1
-counter=0
-limit=40
+wall_flag = 0
+fr_index = 1
+z = 0
+z_scale = float(5*40) / float(3600)
+w_index = 1
+counter = 0
+limit = 40
 
+data_path = ''
+annotation_path = ''
+class_path = ''
+pca_path = ''
+
+gau_classifier = GaussianNB()
+pca_obj = PCA()
 plt.ion()
 
+
+def RepresentsInt(s):
+    try: 
+        int(s)
+        return True
+    except ValueError:
+        return False
+        
+def RepresentsFloat(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+        
 def offline_test():
 
     global wall_flag , wall , fr_index ,  intens ,w_index,phi,sampling
     global phi, z, zscale, gaussian,timewindow , wall_cart,ax,fig1, kat
-
-    print 'set timewindow in frames:'
-    timewindow=input()
-    print 'set max frames for wall settting'
-    wall_end=input()
-    print 'set maximum range'
-    range_limit=input()
-    filename=input('Enter data file name: ')
-    mat=sio.loadmat(filename)
-    #mat=sio.loadmat('bagfile_data.mat')
-    all_data=mat.get('ranges')
-    angle_min=mat.get('angle_min')
-    angle_max=mat.get('angle_max')
-    angle_increment=mat.get('angle_increment')
-    mybuffer=all_data[0]
+    global data_path, class_path, pca_path
     
-    print 'Reduce points by 2? 1/0'
-    if input()==1 :
-        sampling=np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
-    else :
-        sampling=np.arange(0,len(mybuffer),1)
-
-    max_index=len(all_data)
-    em_index=0
-    print 'loading classifier'
-    gaussian=pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
-    print 'ok'
+    print "###################################"
+    print "offline_test.py : test classifier from data file"
+    print "For non interactive input run as follows : "
+    print ">python offline_test.py <data_file_path> <annotation_data> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
+    print "You gave {0} arguments".format(len(sys.argv))
+    print "##################################"
+    if not (len(sys.argv)==7):
+        print 'set timewindow in frames:'
+        timewindow=input()
+        print 'set max frames for wall settting'
+        wall_end=input()
+        print 'set maximum range'
+        range_limit=input()
+        filename=input('Enter data file name: ')
+        mat=sio.loadmat(filename)
+        #mat=sio.loadmat('bagfile_data.mat')
+        all_data=mat.get('ranges')
+        angle_min=mat.get('angle_min')
+        angle_max=mat.get('angle_max')
+        angle_increment=mat.get('angle_increment')
+        mybuffer=all_data[0]
+    #INPUT MANAGEMENT    
+    else:
+        data_path = sys.argv[1]
+        if not os.path.isfile(data_path):
+            while True :
+                try:
+                    data_path=raw_input('Enter data file path: ')
+                    if os.path.isfile(data_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        
+    
+        annotation_path = sys.argv[2]
+        if not os.path.isfile(annotation_path):
+            while True :
+                try:
+                    annotation_path=raw_input('Enter annotation file path: ')
+                    if os.path.isfile(annotation_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        
+        
+        class_path = sys.argv[3]
+        if not os.path.isfile(class_path):
+            while True :
+                try:
+                    class_path=raw_input('Enter classifier object file path: ')
+                    if os.path.isfile(class_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        
+        pca_path = sys.argv[4]
+        if not os.path.isfile(pca_path):
+            while True :
+                try:
+                    pca_path=raw_input('Enter pca object object file path: ')
+                    if os.path.isfile(pca_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        
+        timewindow = sys.argv[5]
+        while not RepresentsInt(timewindow):
+            timewindow=input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+                
+        wall_end = float(sys.argv[6])
+        while not (RepresentsInt(wall_end) or RepresentsFloat(wall_end)):
+            wall_end=input('Set frames for wall: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+    #INPUT MANAGEMENT
+    
+    print "Data File : {0}".format(data_path)
+    print "Annotation File : {0}".format(annotation_path)
+    print "PCA File : {0}".format(pca_path)
+    print "Classifier File : {0}".format(class_path)
+    print "Timewindow : {0}".format(timewindow)
+    print "Wall Frames : {0}".format(wall_end)
+    
+    test_mat=sio.loadmat(data_path)
+    #mat=sio.loadmat('bagfile_data.mat')
+    all_data=test_mat.get('ranges')
+    angle_min=test_mat.get('angle_min')
+    angle_max=test_mat.get('angle_max')
+    angle_increment=test_mat.get('angle_increment')
+    mybuffer=all_data[0]
+    range_limit = np.amax(all_data)
+    #print range_limit
+    #input("Press any key to exit")
+    #sys.exit()
+    
+    #print 'Reduce points by 2? 1/0'
+    #if input()==1 :
+    sampling = np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
+    #else :
+    #    sampling=np.arange(0,len(mybuffer),1)
+    
+    max_index = len(all_data)
+    em_index = 0
+    #LOAD CLASSIFIER and PCA
+    gaussian = pickle.load(open( class_path, "rb" ))
+    pca_obj = pickle.load(open (pca_obj, "rb")
+    #print 'ok'
     
     phi=np.arange(angle_min,angle_max,angle_increment)[sampling]
 

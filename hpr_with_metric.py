@@ -424,7 +424,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 temp.append(zscore(np.array(hogs[i])))
             #AFTER
             temp2 = np.array(hogs)
-            rint temp2.shape
+            print temp2.shape
             
         #AFTER, zscore the array of size <# of clusters> x <#number of features>
         temp2_zscore = zscore(temp2)
