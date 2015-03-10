@@ -21,6 +21,9 @@ from sklearn.naive_bayes import GaussianNB
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+annotated_humans = 0
+annotated_obstacles = 0
+
 def DisplayClassifier():
     t_files_set = False
     path=''
@@ -65,6 +68,14 @@ def DisplayClassifier():
                 t_files = pickle.load( open( path+file_, "rb" ) )
     pickle.dump(t_files, open(path+"traindata_merged.p","wb+"))
     pickle.dump(ann_files, open(path+"annotations_merged.p","wb+"))
+    annot = {}
+    annot["annotations"] = ann_files
+    np_ann_files = np.array(ann_files)
+    np_ann_files = np.sort(np_ann_files)
+    counts = np.bincount(np_ann_files)
+    annot["humans"] = counts[1]
+    annot["obstacles"] = counts[0]
+    sio.savemat('full_set_annotations', annot);
     
     #Create z-scored data
     temp = zscore(t_files)
