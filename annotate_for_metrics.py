@@ -13,6 +13,7 @@ from myhog import hog
 from scipy import special
 from scipy.stats.mstats import zscore
 from gridfit import gridfit
+from matplotlib import cm
 
 
 #pre-made classifiers
@@ -158,16 +159,12 @@ def annotate_for_metrics():
             C=np.array(pol2cart(raw_data,theta,z) ) #convert to Cartesian
 
             if (fr_index % timewindow== 1 or fr_index==1):
-                #print 'Buffer1'
                 mybuffer=C
 
             if (fr_index>1) :
-                #print 'Buffer2'
                 mybuffer=np.concatenate((mybuffer,C), axis=0 )
-                #print 'Buffer2b'
 
             if ((fr_index % timewindow )== 0):
-                #print'Buffer3'
                 mybuffer=mybuffer[np.where(mybuffer[:,0] > 0.2),:][0]
                 
                 print 'empty scans: {0}'.format(em_index)
@@ -176,29 +173,6 @@ def annotate_for_metrics():
                 if len(hogs)!=0:
                     print'len(hogs)!=0'
                     slot_count=slot_count+1
-                    '''
-                    print 'File : {0}'.format(filename)
-                    print 'slot count : {0} || limit :{1}'.format(slot_count, limit)
-                    ha=np.array(slot_count*np.ones(len(mybuffer))) #data point -> slot_number
-
-                    if slot_count==1:
-                            slot_data=ha
-                            all_scans=mybuffer
-                            human_l=human
-                            cluster_l=cluster_labels
-                            all_surf=surfaces
-                            all_hogs=hogs
-                            annotations=ann
-
-                    else:
-                            all_surf=np.vstack((all_surf,surfaces))
-                            all_hogs=np.vstack((all_hogs,hogs))
-                            slot_data=np.hstack((slot_data,ha))
-                            all_scans=np.vstack((all_scans,mybuffer) )
-                            cluster_l=np.hstack((cluster_l,cluster_labels))
-                            human_l=np.hstack((human_l,human))
-                            annotations=np.hstack((annotations,ann))
-                    '''
                    # if slot_count==limit-1 :
                         #exit()
                     if slot_count>limit:
@@ -224,26 +198,33 @@ def pol2cart(r,theta,zed):
     return C
 
 def initialize_plots(wall_cart):
-    global fig1
+    global fig1, fig3
 
-    temp=plt.figure()
+    temp=plt.figure('Scan View From Above')
     plot2d = temp.add_subplot(111)
     plot2d.set_xlabel('Vertical distance')
     plot2d.set_ylabel('Robot is here')
    # plot2d.plot(wall_cart[:,0],wall_cart[:,1])
 
-    fig1=plt.figure()
+    fig1=plt.figure('3D Scan View')
     plot3d= fig1.gca(projection='3d')
     plot3d.set_xlabel('X - Distance')
     plot3d.set_ylabel('Y - Robot')
     plot3d.set_zlabel('Z - time')
     plt.show()
     
+    fig3=plt.figure('3D Gridfit View')
+    #plot3d= fig3.gca(projection='3d')
+    #plot3d.set_xlabel('X - Distance')
+    #plot3d.set_ylabel('Y - Robot')
+    #plot3d.set_zlabel('Z - time')
+    plt.show()
+    
     return plot2d,plot3d
 
-def cluster_train(clear_data):#TODO edw mesa tha prepei na elegxw ta annotations!
+def cluster_train(clear_data):
 
-    global cc, ccnames, kat, ax, fig1, wall_cart, TP, FP, TN, FN, annotations_checked
+    global cc, ccnames, kat, ax, fig1, wall_cart, TP, FP, TN, FN, annotations_checked, fig3
     hogs=[]
     surfaces=[]
     ann=[]
@@ -266,7 +247,20 @@ def cluster_train(clear_data):#TODO edw mesa tha prepei na elegxw ta annotations
             fig1.add_axes(ax)
             #kat.scatter(xi[filter],yi[filter],s=20, c=cc[k-1])
             kat.scatter(xi[filter],yi[filter],s=20, c=cc[k%12])
+            
+            
+            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+            grid=grid-np.amin(grid) #build surface grid
+            fig3.clear()
+            ax3 = fig3.add_subplot(1,1,1, projection='3d')
+            X, Y = np.mgrid[:16, :16]
+            surf = ax3.plot_surface(X, Y, grid, rstride=1, cstride=1, cmap=cm.gray,
+                    linewidth=0, antialiased=False)
+            surfaces.append(grid)
+            hogs.append(hog(grid)) #extract features
+            
             plt.pause(0.0001)
+            
             #print ccnames[k-1],' cluster size :',len(filter[0]), 'Is',ccnames[k-1],'human? '
             print ccnames[k%12],' cluster size :',len(filter[0]), 'Is',ccnames[k%12],'human? '
             while True:
@@ -283,16 +277,6 @@ def cluster_train(clear_data):#TODO edw mesa tha prepei na elegxw ta annotations
                     TP+=1
                     print 'TP'
                     print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
-                    print TP
                 else:
                     TN+=1
                     print 'TN'
@@ -307,10 +291,6 @@ def cluster_train(clear_data):#TODO edw mesa tha prepei na elegxw ta annotations
                     print 'FN'
                     print FN
             annotations_checked+=1
-            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
-            grid=grid-np.amin(grid) #build surface grid
-            surfaces.append(grid)
-            hogs.append(hog(grid)) #extract features
             human[filter]=ha
             ann.append(ha)
 
