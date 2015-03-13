@@ -9,9 +9,18 @@ Python v. 2.7.3
 Scipy v. 0.9.0 
 Sklearn v. 0.10
 
+laser scanner f.o.v : +- 45 deg. , intensity publishing enabled(not yet used)
+
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans
 
+#Sample Run
+	1)Record bag file with laser scans
+	2)Convert it to .mat format
+	3)Manually annotate the data
+	4)Create a classifier, and P.C.A obj
+	5)Test online with the previously created classifier
+	
 #a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
 
 	Enter desired destination with file ending in .mat
