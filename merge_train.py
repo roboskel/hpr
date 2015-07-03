@@ -30,7 +30,7 @@ def DisplayClassifier():
     print "##########################################################"
     print "Run with no arguments to train with data located in current folder"
     print "To specifiy the location of the training data run as follows :"
-    print ">python <path of folder of training data>"
+    print ">python merge_train.py <path of folder of training data>"
     print "##########################################################"
     if (len(sys.argv)==2):
         path = sys.argv[1]

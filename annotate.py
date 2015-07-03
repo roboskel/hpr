@@ -104,7 +104,6 @@ def check_args(arg_list):
     print 'Timewindow : {0}'.format(timewindow)
             
 def offline_train():
-    print "xXxMLG_OFFLINE_TRAIN_NOSCOPExXx"
     print "#######################"
     print "Non interactive train :"
     print "python annotate.py <timewindow> <wall_frames> <data_file_name>"
