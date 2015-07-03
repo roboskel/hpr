@@ -100,7 +100,7 @@ Runs the human pattern recognition (Naive Bayes) classifier and generates a clas
 	
 	$rosrun hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
-#e)annotate_for_metrics.py
+#f)annotate_for_metrics.py
 	
 Runs the mat file that the classifier was run, and lets the user annotate the same clusters as the classifier in order to generate
 some basic metrics (Precision, Recall, Accuracy).
