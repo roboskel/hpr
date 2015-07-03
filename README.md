@@ -43,10 +43,10 @@ Real time recongition of humans through laser scans
 	8)In another terminal 
 		cd 
 	  to the directory of the scripts.
-	  
+
 	9)Run 
 		rosbag play video/video10.bag 
-	  so that the script in step 6 is triggered.
+	  so that the script in the previous step is triggered.
 	
 #a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
 
