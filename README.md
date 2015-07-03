@@ -102,7 +102,7 @@ Runs the human pattern recognition (Naive Bayes) classifier and generates a clas
 
 #f)annotate_for_metrics.py
 	
-Runs the mat file that the classifier was run, and lets the user annotate the same clusters as the classifier in order to generate
+Runs the mat file that the classifier was tested on, and lets the user annotate the same clusters as the classifier in order to generate
 some basic metrics (Precision, Recall, Accuracy).
 
 
