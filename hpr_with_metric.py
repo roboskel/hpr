@@ -405,8 +405,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
     global kat, fig1, ax, wall_cart, gaussian, counter, classification_array, pca_obj
     global annotations, first_time
-    temp=[]
-    temp2=np.empty(36)
+    temp = []
+    #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because after an update on python it stopped working
     
     #ZSCORE UPDATE
     #zscore the entire hogs table, not single cluster hogs
@@ -417,20 +417,23 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             #BEFORE
             temp = zscore(np.array(hogs)[0])
             #AFTER
-            temp2 = np.array(hogs)[0]
+            #temp2 = np.array(hogs)[0]
         else:
             #BEFORE
             for i in range(0,len(hogs)):
                 temp.append(zscore(np.array(hogs[i])))
             #AFTER
-            temp2 = np.array(hogs)
-            print temp2.shape
-            
-        #AFTER, zscore the array of size <# of clusters> x <#number of features>
-        temp2_zscore = zscore(temp2)
-        temp2_zscore = pca_obj.transform(temp2_zscore)
+            #temp2 = np.array(hogs)
+            #print temp2.shape
         
-        results = gaussian.predict(temp2_zscore)
+        #AFTER, zscore the array of size <# of clusters> x <#number of features>
+
+        #temp2_zscore = zscore(temp2)
+        #temp2_zscore = temp2_zscore[np.logical_not(np.isnan(temp2_zscore))]    #remove NaNs from the matrix
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
+        #results = gaussian.predict(temp2_zscore)
+        results = gaussian.predict(temp)
         print results
         cnt=0
         for k in vcl:
