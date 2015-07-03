@@ -201,7 +201,7 @@ def laser_listener():
     b['intensities']=intensities
     b['wall']=wall
     print b['wall']
-    #b['annotations']=annotations
+    b['annotations']=annotations
     b['ranges']=ranges_
     try:
         os.remove('classification_results.mat')

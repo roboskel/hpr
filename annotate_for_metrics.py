@@ -118,23 +118,17 @@ def annotate_for_metrics():
     limit=max_index/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
     
-    sampling=np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
+    sampling=np.arange(0,len(mybuffer),2)#apply sampling every 2 steps
     phi=np.arange(angle_min,angle_max,angle_increment)[sampling]
     
-    print"###########"
-    print phi
-    
     wall = mat.get('wall')#we have the wall from the mat!
+    wall = wall[0,:]
     wall2 = np.zeros(len(wall)/2)
-    #wall.shape(len(wall)+2,1)
-    #wall = np.array(wall)
     for i in range(len(wall)-1):
         if i%2 == 0:
-            wall2[i/2] += (wall[i][0])
-    print wall2
+            wall2[i/2] += (wall[i])
+            
     wall = wall2
-    #exit()
-    
     wall_cart=np.array(pol2cart(wall,phi,0) )[:,0:2] #convert to Cartesian
     kat,ax=initialize_plots(wall_cart)
 
@@ -241,7 +235,6 @@ def cluster_train(clear_data):
     fig1.clear()
     kat.clear()
     kat.plot(wall_cart[:,0],wall_cart[:,1])
-
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>timewindow :
@@ -274,7 +267,7 @@ def cluster_train(clear_data):
                 else:
                     print 'Try again, 1 for human or 0 for obstacle'
                     
-            if ha == classifier_annotations[annotations_checked]:
+            if ha == classifier_annotations[0,annotations_checked]:
                 if ha == 1:
                     TP+=1
                     print 'TP'
@@ -284,7 +277,7 @@ def cluster_train(clear_data):
                     print 'TN'
                     print TN
             else:
-                if classifier_annotations[annotations_checked] == 1:
+                if classifier_annotations[0,annotations_checked] == 1:
                     FP+=1
                     print 'FP'
                     print FP

@@ -48,47 +48,74 @@ Real time recongition of humans through laser scans
 		rosbag play video/video10.bag 
 	  so that the script in the previous step is triggered.
 	
-#a)Convert R.O.S. bagfiles to suitable .mat files using 'bag2mat.py':
+#Python files explained
+#----------------------
 
-	Enter desired destination with file ending in .mat
-	
-Command line use:
+#a)bag2mat.py:
 
-	$rosrun <package_name> bag2mat.py <bag_file_path> <.mat_file_path> <laser_scan_rostopic> <scan_duration>
-
-#b)Annotate with annotate.py :
-
-Either provide command line arguments with the same order as below, or run the script without arguments and provide them when prompted
-
-	*Enter timewindow (int)
-	
-	*Enter frames to set wall (int)
-	
-	*Enter filename (string, no quotes)
-	
-	trained data will be saved as : <input>.<trainingdata>
+	Convert a .bag file to .mat format.
 	
 
 Command line use:
 
-	$python annotate.py <time_window> <wall_set_frames> <mat_file_to_use>
+	$python bag2mat.py <.bag_file_path> <.mat_file_path> <laser_scan_rostopic> <scan_duration>
 
-#c)create classifier with merge_train.py:
+#b)annotate.py :
 
-merge_train will create a classifier in the specified folder
+Annotate (label) each cluster as human or not human, in order to train the classifier later.
+annotate.py generates many .p files, some of which are classifiers trained on each and only file 
+annotated. This means that every time the annotation process ends, a new classifier is created trained
+only on the .mat that was just annotated.
+	
+
+Command line use:
+
+	$python annotate.py <time_window> <number_of_frames_to_create_walls> <.mat_file_path>
+
+#c)merge_train.py:
+
+Merge_train uses all the annotations from a folder, to create a classifier based on all of those
+annotations.
+
+
+Command line use:
 
 	$python merge_train <folder of annotated .mat files>
 	
-#d)Test on live data with hpr_with_metrics.py:
+#d)hpr.py:
 
-	Publish laser scans on topic /scan, enable intensities, set min_angle, max_angle to -45,45 degrees
-	respectively (to be changed).
+Runs the human pattern recognition (Naive Bayes) classifier.
+
+
+	Command line use:
+
+	$python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+
+#e)hpr_with_metrics.py
 	
-Command line use :
-	$rosrun <package_name> hpr.py <classifier object path> <pca objec path> <laserscan topic> <timewindow in frames> <maximum scan range>
+Runs the human pattern recognition (Naive Bayes) classifier and generates a classification_results.mat file that contains its results.
+	
 
-#e)Test with data files instead of live data :
+	Command line use :
+	
+	$rosrun hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+
+#e)annotate_for_metrics.py
+	
+Runs the mat file that the classifier was run, and lets the user annotate the same clusters as the classifier in order to generate
+some basic metrics (Precision, Recall, Accuracy).
+
+
+	Command line use :
+	
+	$rosrun annotate_for_metrics.py </path/to/classification_results.mat>
+
+#g)offline_test.py :
+	todo
 	$python offline_test.py <data_file_path> <annotation_data> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
+
+#h)Library files
+	todo
 
 RECOMMENDATION:
 
