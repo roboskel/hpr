@@ -17,8 +17,10 @@ Real time recongition of humans through laser scans
 #Sample Run
 	1)Record bag file with laser scans (.bag files are provided in video folder)
 	2)cd to the directory of the scripts
-	3)Convert the desired .bag file to .mat format by running python bag2mat.py video/video2.bag video/video2.mat scan 79
+	3)Convert a .bag file to .mat format by running python bag2mat.py video/video2.bag video/video2.mat scan 79
+	3.1)Convert as many as you want by changing the number of the video .bag file
 	4)Manually annotate the data by running python annotate.py 40 10 video/video2.mat
+	4.1)Annotate as many as you want by changing the number of the video .mat file
 	5)Create a classifier, and P.C.A. object by running python merge_train.py video/
 	6)Test online with the previously created classifier by running python hpr_with_metric.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10
 	7)In another terminal, cd to the directory of the scripts.
