@@ -8,10 +8,15 @@ import scipy.io as sio
 import scipy.special
 import matplotlib.pyplot as plt
 import mytools as mt #DBSCAN function and perquisites are stored here
-
+import sys
+import os.path
+from os import listdir
+from os.path import isfile, join, splitext
 from myhog import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
+
+from sklearn.decomposition import PCA
 
 ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
@@ -20,10 +25,16 @@ fr_index=1
 z=0
 z_scale= float(5*25) / float(3600)
 w_index=1
-counter=0
-limit=40
-
+limit=3
+scan_active = True
+scan_received = 0
 plt.ion()
+class_path = ''
+pca_path = ''
+pca_obj = PCA()
+sub_topic = 'scan'
+
+#temp2 = np.zeros((1, 36))
 
 def RepresentsInt(s):
     try: 
@@ -38,83 +49,170 @@ def RepresentsFloat(s):
         return True
     except ValueError:
         return False
-        
+            
 def laser_listener():
-
-    global timewindow,range_limit
-
-    rospy.init_node('laser_listener', anonymous=True)
-    sub_topic = "scan"
-    while True:
-        timewindow=input('Set timewindow in frames: ')
-        if RepresentsInt(timewindow):
-            break
-        else:
-            print 'Try again'
-    while True:
-        range_limit=input('Set maximum scan range: ')
-        if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
-            break
-        else:
-            print 'Try again'
+    #ADDITIONS command line inputs klp
    
-    print('Subscribing to: %s' % sub_topic)
+    print "###################################"
+    print "For non interactive input run as follows : "
+    print "rosrun <package_name> hpr.py <classifier object path> <pca objec path> <laserscan topic> <timewindow in frames> <maximum scan range>"
+    print "##################################"
+    #ADDITIONS
+    
+    global class_path, pca_path, sub_topic, timewindow, range_limit
+    global gaussian, pca_obj
+    
+    #ADDITIONS command line inputs klp
+    if len(sys.argv)>=3:
+        class_path = str(sys.argv[1])
+        pca_path = str(sys.argv[2])
+        print class_path
+        print pca_path
+    
+    if not os.path.isfile(class_path):
+        while True :
+            try:
+                class_path=raw_input('Enter classifier object file path: ')
+                if os.path.isfile(class_path):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+    print "Classifier File : {0}".format(class_path)
+    
+    if not os.path.isfile(pca_path):
+        while True :
+            try:
+                pca_path=raw_input('Enter pca object file path: ')
+                if os.path.isfile(pca_path):
+                    break
+                else:
+                    print 'File does not exist! Try again!'
+            except SyntaxError:
+                print 'Try again'
+    print "File : {0}".format(pca_path)
+    #ADDITIONS command line inputs klp
+    global timewindow, range_limit
+    rospy.init_node('laser_listener', anonymous=True)
+    #ADDITIONS command line inputs klp
+    if len(sys.argv)==6:
+        scan_topic = str(sys.argv[3])
+        timewindow = int(sys.argv[4])
+        while not RepresentsInt(timewindow):
+            timewindow=input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+        range_limit = float(sys.argv[5])
+        while not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
+            range_limit=input('Set maximum scan range in m: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+    else:
+        sub_topic = "scan"
+        while True:
+            timewindow=input('Set timewindow in frames: ')
+            if RepresentsInt(timewindow):
+                break
+            else:
+                print 'Try again'
+        while True:
+            range_limit=input('Set maximum scan range: ')
+            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+                break
+            else:
+                print 'Try again'
+   
+    print "Classifier object path : ", class_path 
+    print "PCA object path : ", pca_path
+    print "Scan Topic : ", sub_topic
+    print "Timewindow (frames) : ",timewindow
+    print "Maximum scan range (meters)", range_limit
+    print "Waiting for laser scans ..."
+    #ADDITIONS command line inputs klp
+    
     rospy.Subscriber(sub_topic,LaserScan,online_test)
-    rospy.spin()
+    scan_received=rospy.Time.now().to_sec()
+    gaussian, pca_obj = loadfiles()
+    while not rospy.is_shutdown():  
+        rospy.spin()
+    #sys.exit()
 
 def online_test(laser_data):
-    global wall_flag , wall , fr_index ,  intens ,w_index,phi,sampling
+    global wall_flag, wall, fr_index, intens, w_index, phi, sampling, limit #prosthesa to limit edw giati den to epairne global
     global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1, kat
-
-    if wall_flag==0:
+    global pca_obj
+    global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges
+    if wall_flag == 0:
         #print "-------------- 1"
-        if w_index==1:
+        if w_index == 1:
             #print "-------------- 2"
-            #print 'Reduce points by 2? 1/0'
-           # if input()==1 :
-            sampling=np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
-            #else :
-            #    sampling=np.arange(0,len(np.array(laser_data.ranges)),1)
-            R,intens,F,gaussian=loadfiles()
-            wall=np.array(laser_data.ranges)
-            mybuffer=wall
-            filter=np.where(wall>=range_limit)
-            wall[filter]=range_limit
+            sampling = np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
+            
+            #ADDITIONS allaksa na mhn epistrefei ta asxeta poy den xrhsimopoioyntai
+            #ADDITIONS TO PARAKATW METAFERTHIKE PANW, GINETAI PLEON MIA FORA
+            #gaussian, pca_obj = loadfiles()
+            
+            #wall data now contains the scan ranges
+            wall = np.array(laser_data.ranges)
+            #ADDITIONS
+            
+            mybuffer = wall
+            #get indexes of scans >= range_limit
+            filter=np.where(wall >= range_limit)
+            #set thos scans to maximum range
+            wall[filter] = range_limit
             w_index=w_index+1
-        if w_index<limit:
+            
+        if w_index<limit: #loop until you have enough scans to set walls
             #print "-------------- 3"
-            wall=np.array(laser_data.ranges)
-            filter=np.where(wall>=range_limit)
-            wall[filter]=range_limit
-            mybuffer=np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 360)
-            w_index=w_index+1
+            wall = np.array(laser_data.ranges)
+            filter = np.where(wall >= range_limit)
+            wall[filter] = range_limit
+            mybuffer = np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 360)
+            w_index = w_index+1
         if w_index==limit:
             #print "-------------- 4"
-            mybuffer=np.vstack((mybuffer,wall ))
-            phi=np.arange(laser_data.angle_min,laser_data.angle_max,laser_data.angle_increment)[sampling]
-            wall=(np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
-            wall_cart=np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
-            wall_flag=1
+            mybuffer = np.vstack((mybuffer,wall ))
+            phi = np.arange(laser_data.angle_min,laser_data.angle_max,laser_data.angle_increment)[sampling]
+            wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
+            wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
+            wall_flag = 1
             kat,ax=initialize_plots(wall_cart)
             #kat=initialize_plots(wall_cart)
+            angle_increment=laser_data.angle_increment
+            scan_time=laser_data.scan_time
+            angle_min=laser_data.angle_min
+            angle_max=laser_data.angle_max
+            intensities=laser_data.intensities
             print 'walls set...'
         
     else:
+        #walls are set, process scans
         #print "-------------- 5"
-        ranges=np.array(laser_data.ranges)[sampling]
+        ranges = np.array(laser_data.ranges)[sampling]
         filter = np.where(ranges < wall) # filter out walls
         ranges = ranges[filter]
         theta = phi[filter]
 
+        #if first_time_ranges:
+         #   ranges_= np.array(laser_data.ranges)[sampling]
+         #   first_time_ranges = False
+       # else:
+         #   ranges_ = np.vstack((ranges_, np.array(laser_data.ranges)[sampling]))
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
             #print "-------------- 6"
-            C=np.array(pol2cart(ranges,theta,z) ) #convert to Cartesian
+            C = np.array(pol2cart(ranges,theta,z) ) #convert to Cartesian
 
             if (fr_index ==1 ):
-                mybuffer=C
+                mybuffer = C #mybuffer is the cartesian coord of the first scan
             else :
-                mybuffer=np.concatenate((mybuffer,C), axis=0 )  #  add to
+                mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
 
             if (fr_index == timewindow ):
 
@@ -127,6 +225,7 @@ def online_test(laser_data):
                 z=- z_scale
             z = z + z_scale
             fr_index=fr_index+1
+    
 
 def pol2cart(r,theta,zed):
 
@@ -139,18 +238,27 @@ def pol2cart(r,theta,zed):
 
 def loadfiles():
     
+    #ADDITIONS
+    global class_path
+    global pca_path
+    #ADDITIONS
+    
+    #ADDITIONS ta apokatw htan ayta ta axrista poy fortonontousan
     #Load intensity-range-angle data and classifier
-    mat=sio.loadmat('ideal_data.mat')
-    ranges=mat.get('ranges')
-    intensities=mat.get('intensities')
-    angle_min=mat.get('angle_min')
-    angle_max=mat.get('angle_max')
-    angle_increment=mat.get('angle_increment')
-    theta=np.arange(angle_min,angle_max,angle_increment)
-
-    classifier = pickle.load( open( "Gaussian_NB_classifier.p", "rb" ) )
-
-    return ranges,intensities,theta,classifier
+    #mat=sio.loadmat('ideal_data.mat')
+    #ranges=mat.get('ranges')
+    #intensities=mat.get('intensities')
+    #angle_min=mat.get('angle_min')
+    #angle_max=mat.get('angle_max')
+    #angle_increment=mat.get('angle_increment')
+    #theta=np.arange(angle_min,angle_max,angle_increment)
+    
+    classifier = pickle.load( open( class_path, "rb" ) )
+    pca_obj = pickle.load(open ( pca_path, "rb"))
+    
+    #print classifier_ilithiou.class_prior
+    #return ranges,intensities,theta,classifier
+    return classifier, pca_obj
 
 def initialize_plots(wall_cart):
     global fig1
@@ -173,7 +281,7 @@ def initialize_plots(wall_cart):
 def clustering(clear_data):
 
     global cc, ccnames, fig1
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
     colors=[]
     vcl=[] #Valid Cluster Labels 
@@ -201,7 +309,7 @@ def clustering(clear_data):
             hogs.append(hog(grid))  #extract hog features
 
     fig1.show()
-
+    
     update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl)
     
 def scatter_all(xi,yi,zi,cluster_labels):
@@ -224,19 +332,37 @@ def scatter_all(xi,yi,zi,cluster_labels):
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
-    global kat,fig1,ax,wall_cart,gaussian,counter
-    temp=[]
+    global kat, fig1, ax, wall_cart, gaussian, pca_obj
+    temp = []
+    #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because after an update on python it stopped working
+    
+    #ZSCORE UPDATE
+    #zscore the entire hogs table, not single cluster hogs
     if flag==1:
         kat.clear()
         kat.plot(wall_cart[:,0],wall_cart[:,1])
         if np.array(hogs).shape==(1,36):
-            temp=zscore(np.array(hogs)[0])
+            #BEFORE
+            temp = zscore(np.array(hogs)[0])
+            #AFTER
+            #temp2 = np.array(hogs)[0]
         else:
+            #BEFORE
             for i in range(0,len(hogs)):
                 temp.append(zscore(np.array(hogs[i])))
+            #AFTER
+            #temp2 = np.array(hogs)
+            #print temp2.shape
+        
+        #AFTER, zscore the array of size <# of clusters> x <#number of features>
 
-        results= gaussian.predict(np.array(temp)) #CLASSIFICATION
-
+        #temp2_zscore = zscore(temp2)
+        #temp2_zscore = temp2_zscore[np.logical_not(np.isnan(temp2_zscore))]    #remove NaNs from the matrix
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
+        #results = gaussian.predict(temp2_zscore)
+        results = gaussian.predict(temp)
+        print results
         cnt=0
         for k in vcl:
 
@@ -254,9 +380,6 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 fig1.add_axes(ax)
             cnt=cnt+1
         plt.pause(0.0001)
-
-
-        counter=counter+cnt
 
 
 

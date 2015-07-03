@@ -121,6 +121,8 @@ def annotate_for_metrics():
     sampling=np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
     phi=np.arange(angle_min,angle_max,angle_increment)[sampling]
     
+    print"###########"
+    print phi
     
     wall = mat.get('wall')#we have the wall from the mat!
     wall2 = np.zeros(len(wall)/2)

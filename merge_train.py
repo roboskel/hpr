@@ -92,6 +92,7 @@ def DisplayClassifier():
     pickle.dump( gaussian_nb, open(path+"Gaussian_NB_classifier_merged.p", "wb+" ) )
     pickle.dump( pca, open(path+"PCA_object.p", "wb+"))
     
+    print "merge_train was successful"
     raw_input("Press any key to exit")
 
 

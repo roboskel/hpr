@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-__author__="athanasia sapountzi, lydakis andreas, stavrinos georgios"
+__author__="athanasia sapountzi"
 
 import roslib, warnings, rospy, math, pickle
 import numpy as np

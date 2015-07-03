@@ -443,12 +443,12 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
 
             if results[cnt]==1:
-                classification_array.append(1)
+                #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, c='r') #human
                 fig1.add_axes(ax)
             else:
-                classification_array.append(0)
+                #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, c='b') #object
                 fig1.add_axes(ax)
