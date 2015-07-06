@@ -30,6 +30,8 @@ w_index = 1
 limit = 40
 slot_count = 0
 
+first_time = True
+first_time_ranges = True
 data_path = ''
 class_path = ''
 pca_path = ''
@@ -59,28 +61,14 @@ def offline_test():
     global phi, z, zscale, gau_classifier, timewindow , wall_cart, ax, fig1, kat
     global data_path, class_path, pca_path, pca_obj
     global slot_count, limit
+    global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges
     
-    print "###################################"
-    print "offline_test.py : test classifier from .mat file"
-    print "For non interactive input run as follows : "
-    print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
-    print "You gave {0} arguments".format(len(sys.argv))
-    print "##################################"
     if not (len(sys.argv)==6):
-        print 'set timewindow in frames:'
-        timewindow=input()
-        print 'set max frames for wall settting'
-        wall_end=input()
-        print 'set maximum range'
-        range_limit=input()
-        filename=raw_input('Enter data file name: ')
-        mat=sio.loadmat(filename)
-        all_data=mat.get('ranges')
-        angle_min=mat.get('angle_min')
-        angle_max=mat.get('angle_max')
-        angle_increment=mat.get('angle_increment')
-        intensities = test_mat.get('intensities')
-        mybuffer=all_data[0]
+        print "###################################"
+        print "You gave {0} arguments".format(len(sys.argv))
+        print "Run using"
+        print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
+        print "###################################"
     #INPUT MANAGEMENT    
     else:
         data_path = sys.argv[1]
@@ -196,6 +184,12 @@ def offline_test():
         ranges = ranges[filter]
         theta = phi[filter]
         
+        if first_time_ranges:
+            ranges_= np.array(all_data[outer_index])[sampling]
+            first_time_ranges = False
+        else:
+            ranges_ = np.vstack((ranges_, np.array(all_data[outer_index])[sampling]))
+
         print "Ranges : {0}".format(len(ranges))
         
         if (len(ranges)<3 ):
@@ -227,7 +221,7 @@ def offline_test():
 
 
     b={}
-    b['timewindow']=timewindow
+    b['timewindow']=int(timewindow)
     b['range_limit']=range_limit
     b['angle_increment']=angle_increment
     #b['scan_time']=scan_time
@@ -341,6 +335,7 @@ def scatter_all(xi,yi,zi,cluster_labels):
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
 
     global kat, fig1, ax, wall_cart, gau_classifier, pca_obj
+    global annotations, first_time
     
     temp=[]
     temp2=np.empty(36)
@@ -387,6 +382,11 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             cnt=cnt+1
         plt.pause(0.0001)
         key_press = raw_input("Press a key to continue")
+        if first_time:
+            annotations = np.array(results)
+            first_time = False
+        else:
+            annotations=np.hstack((annotations,np.array(results)))
 
 
 if __name__ == '__main__':

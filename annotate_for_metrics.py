@@ -114,7 +114,8 @@ def annotate_for_metrics():
     classifier_annotations = mat.get('annotations')
     max_index=len(all_data)
     mybuffer=all_data[0]
-
+    print"asasdasdasdasd"
+    print timewindow
     limit=max_index/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
     
@@ -127,7 +128,7 @@ def annotate_for_metrics():
     for i in range(len(wall)-1):
         if i%2 == 0:
             wall2[i/2] += (wall[i])
-            
+
     wall = wall2
     wall_cart=np.array(pol2cart(wall,phi,0) )[:,0:2] #convert to Cartesian
     kat,ax=initialize_plots(wall_cart)

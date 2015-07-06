@@ -59,28 +59,12 @@ def offline_test():
     global data_path, class_path, pca_path, pca_obj
     global slot_count, limit
     
-    
-    print "###################################"
-    print "offline_test.py : test classifier from .mat file"
-    print "For non interactive input run as follows : "
-    print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
-    print "You gave {0} arguments".format(len(sys.argv))
-    print "##################################"
     if not (len(sys.argv)==6):
-        print 'set timewindow in frames:'
-        timewindow=input()
-        print 'set max frames for wall settting'
-        wall_end=input()
-        print 'set maximum range'
-        range_limit=input()
-        filename=input('Enter data file name: ')
-        mat=sio.loadmat(filename)
-        pca 
-        all_data=mat.get('ranges')
-        angle_min=mat.get('angle_min')
-        angle_max=mat.get('angle_max')
-        angle_increment=mat.get('angle_increment')
-        mybuffer=all_data[0]
+    print "###################################"
+    print "You gave {0} arguments".format(len(sys.argv))
+    print "Run using"
+    print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
+    print "###################################"
     #INPUT MANAGEMENT    
     else:
         data_path = sys.argv[1]
@@ -364,8 +348,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 ax.scatter(x,y, zed, 'z', 30, c='b') #object
                 fig1.add_axes(ax)
             cnt=cnt+1
-        plt.pause(0.0001)
         key_press = raw_input("Press a key to continue")
+        plt.pause(0.0001)
 
 
 if __name__ == '__main__':

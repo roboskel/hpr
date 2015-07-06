@@ -58,7 +58,7 @@ Real time recongition of humans through laser scans
 
 Command line use:
 
-	$python bag2mat.py <.bag_file_path> <.mat_file_path> <laser_scan_rostopic> <scan_duration>
+	python bag2mat.py <.bag_file_path> <.mat_file_path> <laser_scan_rostopic> <scan_duration>
 
 #b)annotate.py :
 
@@ -70,7 +70,7 @@ only on the .mat that was just annotated.
 
 Command line use:
 
-	$python annotate.py <time_window> <number_of_frames_to_create_walls> <.mat_file_path>
+	python annotate.py <time_window> <number_of_frames_to_create_walls> <.mat_file_path>
 
 #c)merge_train.py:
 
@@ -80,7 +80,7 @@ annotations.
 
 Command line use:
 
-	$python merge_train <folder of annotated .mat files>
+	python merge_train <folder of annotated .mat files>
 	
 #d)hpr.py:
 
@@ -89,7 +89,7 @@ Runs the human pattern recognition (Naive Bayes) classifier.
 
 	Command line use:
 
-	$python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+	python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
 #e)hpr_with_metrics.py
 	
@@ -98,7 +98,7 @@ Runs the human pattern recognition (Naive Bayes) classifier and generates a clas
 
 	Command line use :
 	
-	$python hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+	python hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
 #f)annotate_for_metrics.py
 	
@@ -108,11 +108,14 @@ some basic metrics (Precision, Recall, Accuracy).
 
 	Command line use :
 	
-	$python annotate_for_metrics.py </path/to/classification_results.mat>
+	python annotate_for_metrics.py </path/to/classification_results.mat>
 
 #g)offline_test.py :
-	todo
-	$python offline_test.py <data_file_path> <annotation_data> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
+Runs the specified classifier on a .mat file instead of a topic.
+
+	Command line use :
+
+	python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
 
 #h)Library files
 	todo
