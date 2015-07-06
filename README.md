@@ -117,11 +117,27 @@ Runs the specified classifier on a .mat file instead of a topic.
 
 	python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
 
-#h)Library files
-	todo
+#h)offline_test_with_metrics.py :
+Runs the specified classifier on a .mat file instead of a topic, and generates a classification_results.mat file that contains its results.
+
+	Command line use :
+
+	python offline_test_with_metrics.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
+
+#i)Library files
+gridfit.py, myhog.py and mytools.py are libraries used to run the code. They were pre-written by others or ported to python.
+
+#j)online_calibration_node.py, optimal_test.py
+These two python files are not used anymore. They are still here just for legacy reasons and in case something new comes to our mind. You can freely ignore them.
+
+#k)ideal_data.mat
+This .mat file contains the basic information regarding the laser scans. It is not used by any of our currently used scripts, but it's still here for the sake of completeness
+and future reference.
+
 
 RECOMMENDATION:
-
-	Use same timewindow, and wall set time for each training set, and use the same values when
-	evaluating
+	
+	1) Run the Sample Run first. It will help you understand what each .py does.
+	2) Use same timewindow, and wall set time for each training set, and use the same values when
+	evaluating.
     
