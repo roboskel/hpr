@@ -38,7 +38,7 @@ Real time recongition of humans through laser scans
 		python merge_train.py video/
 
 	7)Test online with the previously created classifier by running 
-		python hpr_with_metric.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10
+		python hpr_with_metrics.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10
 
 	8)In another terminal 
 		cd 
