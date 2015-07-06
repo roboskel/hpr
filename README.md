@@ -87,7 +87,7 @@ Command line use:
 Runs the human pattern recognition (Naive Bayes) classifier.
 
 
-	Command line use:
+Command line use:
 
 	python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
