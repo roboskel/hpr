@@ -96,7 +96,7 @@ Runs the human pattern recognition (Naive Bayes) classifier.
 Runs the human pattern recognition (Naive Bayes) classifier and generates a classification_results.mat file that contains its results.
 	
 
-	Command line use :
+Command line use :
 	
 	python hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
@@ -106,21 +106,21 @@ Runs the mat file that the classifier was tested on, and lets the user annotate 
 some basic metrics (Precision, Recall, Accuracy).
 
 
-	Command line use :
+Command line use :
 	
 	python annotate_for_metrics.py </path/to/classification_results.mat>
 
 #VII)offline_test.py :
 Runs the specified classifier on a .mat file instead of a topic.
 
-	Command line use :
+Command line use :
 
 	python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
 
 #VIII)offline_test_with_metrics.py :
 Runs the specified classifier on a .mat file instead of a topic, and generates a classification_results.mat file that contains its results.
 
-	Command line use :
+Command line use :
 
 	python offline_test_with_metrics.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
 
