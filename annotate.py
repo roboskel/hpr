@@ -27,7 +27,9 @@ ccnames =['GRAY', 'BLACK', 'VIOLET', 'BLUE', 'CYAN', 'ROSY', 'ORANGE', 'RED', 'G
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
 
 fr_index=0
-z_scale= float(5*25) / float(3600)
+dt = 25;#period in ms (dt between scans)
+speed = 5;#human walking speed in km/h
+z_scale= float(speed*dt) / float(3600)
 z=-z_scale
 slot_count=0
 

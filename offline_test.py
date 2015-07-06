@@ -23,23 +23,20 @@ cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g',
 wall_flag = 0
 fr_index = 0
 z = 0
-z_scale= float(5*25) / float(3600)
+dt = 25;#period in ms (dt between scans)
+speed = 5;#human walking speed in km/h
+z_scale= float(speed*dt) / float(3600)
 w_index = 1
-counter = 0
 limit = 40
 slot_count = 0
-classification_results = []
-annotated_data=[]
 
 data_path = ''
-annotation_path = ''
 class_path = ''
 pca_path = ''
 
 gau_classifier = GaussianNB()
 pca_obj = PCA()
 plt.ion()
-super_hogs=[]
 
 def RepresentsInt(s):
     try: 
@@ -55,56 +52,21 @@ def RepresentsFloat(s):
     except ValueError:
         return False
 
-def calc_metrics():
-    
-    global annotated_data, classification_results
-    pos = 1
-    true_pos = 0.0
-    true_neg = 0.0
-    false_pos = 0.0
-    false_neg = 0.0
-    neg = 0
-    
-    annotated_data = np.array(annotated_data)
-    classification_results = np.array(classification_results)
-    print annotated_data
-    print classification_results
-    key_press = raw_input("Press to continue")
-    
-    for i in range(len(classification_results)):
-        if annotated_data[i]==1:
-            if classification_results[i]==1:
-                true_pos += 1.0
-            else:
-                false_neg += 1.0
-        else:
-            if classification_results[i]==1:
-                false_pos += 1.0
-            else:
-                true_neg += 1.0
-    precision = true_pos/(true_pos + false_pos)
-    recall = true_pos/(true_pos + false_neg)
-    accuracy = (true_pos + true_neg)/(true_pos + false_pos + true_neg + false_neg)
-    print "Precision : {0}".format(precision)
-    print "Recall : {0}".format(recall)
-    print "Accuracy : {0}".format(accuracy)
-    input ("Press any key to exit")
-    return
 def offline_test():
 
     global wall_flag , wall , fr_index ,  intens ,w_index,phi,sampling
     global phi, z, zscale, gau_classifier,timewindow , wall_cart,ax,fig1, kat
     global data_path, class_path, pca_path, pca_obj
-    global classification_results, super_hogs, slot_count, limit, annotated_data
+    global slot_count, limit
     
     
     print "###################################"
-    print "offline_test.py : test classifier from data file"
+    print "offline_test.py : test classifier from .mat file"
     print "For non interactive input run as follows : "
-    print ">python offline_test.py <data_file_path> <annotation_data> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
+    print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
     print "You gave {0} arguments".format(len(sys.argv))
     print "##################################"
-    if not (len(sys.argv)==7):
+    if not (len(sys.argv)==6):
         print 'set timewindow in frames:'
         timewindow=input()
         print 'set max frames for wall settting'
@@ -125,7 +87,7 @@ def offline_test():
         if not os.path.isfile(data_path):
             while True :
                 try:
-                    data_path=raw_input('Enter data file path: ')
+                    data_path=raw_input('Enter .mat file path: ')
                     if os.path.isfile(data_path):
                         break
                     else:
@@ -133,20 +95,7 @@ def offline_test():
                 except SyntaxError:
                     print 'Try again'
         
-        annotation_path = sys.argv[2]
-        if not os.path.isfile(annotation_path):
-            while True :
-                try:
-                    annotation_path=raw_input('Enter annotation file path: ')
-                    if os.path.isfile(annotation_path):
-                        break
-                    else:
-                        print 'File does not exist! Try again!'
-                except SyntaxError:
-                    print 'Try again'
-        
-        
-        class_path = sys.argv[3]
+        class_path = sys.argv[2]
         if not os.path.isfile(class_path):
             while True :
                 try:
@@ -158,7 +107,7 @@ def offline_test():
                 except SyntaxError:
                     print 'Try again'
         
-        pca_path = sys.argv[4]
+        pca_path = sys.argv[3]
         if not os.path.isfile(pca_path):
             while True :
                 try:
@@ -170,7 +119,7 @@ def offline_test():
                 except SyntaxError:
                     print 'Try again'
         
-        timewindow = sys.argv[5]
+        timewindow = sys.argv[4]
         while not RepresentsInt(timewindow):
             timewindow=input('Set timewindow in frames: ')
             if RepresentsInt(timewindow):
@@ -178,7 +127,7 @@ def offline_test():
             else:
                 print 'Try again'
                 
-        wall_end = float(sys.argv[6])
+        wall_end = float(sys.argv[5])
         while not (RepresentsInt(wall_end) or RepresentsFloat(wall_end)):
             wall_end=input('Set frames for wall: ')
             if RepresentsInt(timewindow):
@@ -188,7 +137,6 @@ def offline_test():
     #INPUT MANAGEMENT
     
     print "Data File : {0}".format(data_path)
-    print "Annotation File : {0}".format(annotation_path)
     print "PCA File : {0}".format(pca_path)
     print "Classifier File : {0}".format(class_path)
     print "Timewindow : {0}".format(timewindow)
@@ -203,10 +151,6 @@ def offline_test():
     mybuffer = all_data[0]
     range_limit = np.amax(all_data)
     
-    
-    #LOAD ANNOTATED FILE
-    annotated_data = pickle.load( open( annotation_path, "rb" ) )
-    
     sampling = np.arange(0,len(mybuffer),2)#apply sampling e.g every 2 steps
     max_index = len(all_data)
     print "Max Index : {0}".format(max_index)
@@ -218,8 +162,7 @@ def offline_test():
     #LOAD CLASSIFIER and PCA
     gau_classifier = pickle.load(open( class_path, "rb" ))
     pca_obj = pickle.load(open (pca_path, "rb"))
-    
-    key_press = raw_input("Press any key to cont.")
+
     phi = np.arange(angle_min,angle_max,angle_increment)[sampling]
     wall = all_data[0]
     
@@ -280,7 +223,6 @@ def offline_test():
                 if len(mybuffer>3): #at least 3 points are needed to form a cluster
                     print "Clustering"
                     clustering(mybuffer)
-    print "HERE"
     
 def pol2cart(r,theta,zed):
 
@@ -347,14 +289,9 @@ def clustering(clear_data):
         ha=np.array(slot_count*np.ones(len(clear_data))) #data point -> slot_number
         update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl)
         fig1.show()
-        if slot_count==limit-1 :
+        if slot_count>=limit-1 :
             #build_classifier(np.array(all_hogs),np.array(annotations))
             #save_data()
-            calc_metrics()
-            exit()
-        if slot_count>limit:
-            calc_metrics()
-            print 'EXITING'
             exit()
     print "Slot Count : {0}".format(slot_count)
     print "Limit : {0}".format(limit)                    
@@ -382,7 +319,7 @@ def scatter_all(xi,yi,zi,cluster_labels):
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
 
-    global kat, fig1, ax, wall_cart, gau_classifier, counter, pca_obj, classification_results
+    global kat, fig1, ax, wall_cart, gau_classifier, pca_obj
     
     temp=[]
     temp2=np.empty(36)
@@ -421,17 +358,14 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, c='r') #human
                 fig1.add_axes(ax)
-                classification_results.append(1)
                 
             else:
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, c='b') #object
                 fig1.add_axes(ax)
-                classification_results.append(0)
             cnt=cnt+1
         plt.pause(0.0001)
         key_press = raw_input("Press a key to continue")
-        counter=counter+cnt
 
 
 if __name__ == '__main__':

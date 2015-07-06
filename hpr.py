@@ -23,7 +23,9 @@ cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g',
 wall_flag=0
 fr_index=1
 z=0
-z_scale= float(5*25) / float(3600)
+dt = 25;#period in ms (dt between scans)
+speed = 5;#human walking speed in km/h
+z_scale= float(speed*dt) / float(3600)
 w_index=1
 limit=3
 scan_active = True
@@ -55,7 +57,7 @@ def laser_listener():
    
     print "###################################"
     print "For non interactive input run as follows : "
-    print "rosrun <package_name> hpr.py <classifier object path> <pca objec path> <laserscan topic> <timewindow in frames> <maximum scan range>"
+    print "python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>"
     print "##################################"
     #ADDITIONS
     

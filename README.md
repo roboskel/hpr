@@ -98,7 +98,7 @@ Runs the human pattern recognition (Naive Bayes) classifier and generates a clas
 
 	Command line use :
 	
-	$rosrun hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+	$python hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
 
 #f)annotate_for_metrics.py
 	
@@ -108,7 +108,7 @@ some basic metrics (Precision, Recall, Accuracy).
 
 	Command line use :
 	
-	$rosrun annotate_for_metrics.py </path/to/classification_results.mat>
+	$python annotate_for_metrics.py </path/to/classification_results.mat>
 
 #g)offline_test.py :
 	todo
