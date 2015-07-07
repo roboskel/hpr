@@ -29,12 +29,17 @@ z_scale= float(speed*dt) / float(3600)
 w_index=1
 limit=3
 scan_active = True
+classification_array = []
 scan_received = 0
 plt.ion()
 class_path = ''
 pca_path = ''
 pca_obj = PCA()
+annotation_file = ''
+first_time = True
+first_time_ranges = True
 sub_topic = 'scan'
+metrics = 0
 
 #temp2 = np.zeros((1, 36))
 
@@ -51,54 +56,80 @@ def RepresentsFloat(s):
         return True
     except ValueError:
         return False
-            
+'''
+def Calculate_Metrics(annotated_data):
+    global classification_array
+    pos = 1
+    true_pos = 0.0
+    true_neg = 0.0
+    false_pos = 0.0
+    false_neg = 0.0
+    neg = 0
+    #print len(annotated_data)
+    classification_array = np.array(classification_array)
+    #print len(classification_array)
+    for i in range(len(classification_array)):
+        if annotated_data[i]==1:
+            if classification_array[i]==1:
+                true_pos += 1.0
+            else:
+                false_neg += 1.0
+        else:
+            if classification_array[i]==1:
+                false_pos += 1.0
+            else:
+                true_neg += 1.0
+    precision = true_pos/(true_pos + false_pos)
+    recall = true_pos/(true_pos + false_neg)
+    accuracy = (true_pos + true_neg)/(true_pos + false_pos + true_neg + false_neg)
+    print "Precision : {0}".format(precision)
+    print "Recall : {0}".format(recall)
+    print "Accuracy : {0}".format(accuracy)
+    input ("Press any key to exit")
+    return
+'''       
 def laser_listener():
-    #ADDITIONS command line inputs klp
-   
-    print "###################################"
-    print "For non interactive input run as follows : "
-    print "python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>"
-    print "##################################"
-    #ADDITIONS
     
     global class_path, pca_path, sub_topic, timewindow, range_limit
+    global annotations
     global gaussian, pca_obj
+    global timewindow, range_limit, annotated_data, classification_array
     
-    #ADDITIONS command line inputs klp
-    if len(sys.argv)>=3:
+    if not len(sys.argv) == 7:
+        print "###################################"
+        print "For non interactive input run as follows : "
+        print "python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>"
+        print "###################################"
+        exit()
+    else:
         class_path = str(sys.argv[1])
         pca_path = str(sys.argv[2])
-        print class_path
-        print pca_path
-    
-    if not os.path.isfile(class_path):
-        while True :
-            try:
-                class_path=raw_input('Enter classifier object file path: ')
-                if os.path.isfile(class_path):
-                    break
-                else:
-                    print 'File does not exist! Try again!'
-            except SyntaxError:
-                print 'Try again'
-    print "Classifier File : {0}".format(class_path)
-    
-    if not os.path.isfile(pca_path):
-        while True :
-            try:
-                pca_path=raw_input('Enter pca object file path: ')
-                if os.path.isfile(pca_path):
-                    break
-                else:
-                    print 'File does not exist! Try again!'
-            except SyntaxError:
-                print 'Try again'
-    print "File : {0}".format(pca_path)
-    #ADDITIONS command line inputs klp
-    global timewindow, range_limit
-    rospy.init_node('laser_listener', anonymous=True)
-    #ADDITIONS command line inputs klp
-    if len(sys.argv)==6:
+        if not os.path.isfile(class_path):
+            while True :
+                try:
+                    class_path=raw_input('Enter classifier object file path: ')
+                    if os.path.isfile(class_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        print "Classifier File : {0}".format(class_path)
+        
+        if not os.path.isfile(pca_path):
+            while True :
+                try:
+                    pca_path=raw_input('Enter pca object file path: ')
+                    if os.path.isfile(pca_path):
+                        break
+                    else:
+                        print 'File does not exist! Try again!'
+                except SyntaxError:
+                    print 'Try again'
+        print "File : {0}".format(pca_path)
+
+        rospy.init_node('laser_listener', anonymous=True)
+        #ADDITIONS command line inputs klp
         scan_topic = str(sys.argv[3])
         timewindow = int(sys.argv[4])
         while not RepresentsInt(timewindow):
@@ -110,21 +141,14 @@ def laser_listener():
         range_limit = float(sys.argv[5])
         while not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
             range_limit=input('Set maximum scan range in m: ')
-            if RepresentsInt(timewindow):
+            if RepresentsInt(range_limit):
                 break
             else:
                 print 'Try again'
-    else:
-        sub_topic = "scan"
-        while True:
-            timewindow=input('Set timewindow in frames: ')
-            if RepresentsInt(timewindow):
-                break
-            else:
-                print 'Try again'
-        while True:
-            range_limit=input('Set maximum scan range: ')
-            if RepresentsInt(range_limit) or RepresentsFloat(range_limit):
+        metrics = int(sys.argv[6])
+        while not (RepresentsInt(metrics)):
+            metrics=input('Set maximum scan range in m: ')
+            if RepresentsInt(metrics):
                 break
             else:
                 print 'Try again'
@@ -142,6 +166,27 @@ def laser_listener():
     gaussian, pca_obj = loadfiles()
     while not rospy.is_shutdown():  
         rospy.spin()
+    #we come here when Ctrl+C is pressed, so we can save!
+    if metrics == 1:
+        b={}
+        b['timewindow']=timewindow
+        b['range_limit']=range_limit
+        b['angle_increment']=angle_increment
+        #b['scan_time']=scan_time
+        b['angle_min']=angle_min
+        b['angle_max']=angle_max
+        b['intensities']=intensities
+        b['wall']=wall
+        print b['wall']
+        b['annotations']=annotations
+        b['ranges']=ranges_
+        try:
+            os.remove('classification_results.mat')
+        except OSError:
+            pass
+        sio.savemat('classification_results',b);
+    print "D O N E !"
+    #Calculate_Metrics(annotated_data)
     #sys.exit()
 
 def online_test(laser_data):
@@ -201,11 +246,12 @@ def online_test(laser_data):
         ranges = ranges[filter]
         theta = phi[filter]
 
-        #if first_time_ranges:
-         #   ranges_= np.array(laser_data.ranges)[sampling]
-         #   first_time_ranges = False
-       # else:
-         #   ranges_ = np.vstack((ranges_, np.array(laser_data.ranges)[sampling]))
+        if metrics == 1:
+            if first_time_ranges:
+                ranges_= np.array(laser_data.ranges)[sampling]
+                first_time_ranges = False
+            else:
+                ranges_ = np.vstack((ranges_, np.array(laser_data.ranges)[sampling]))
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
             #print "-------------- 6"
@@ -227,6 +273,7 @@ def online_test(laser_data):
                 z=- z_scale
             z = z + z_scale
             fr_index=fr_index+1
+    #classification_array = np.array(classification_array)
     
 
 def pol2cart(r,theta,zed):
@@ -334,7 +381,8 @@ def scatter_all(xi,yi,zi,cluster_labels):
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
-    global kat, fig1, ax, wall_cart, gaussian, pca_obj
+    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj
+    global annotations, first_time
     temp = []
     #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because after an update on python it stopped working
     
@@ -373,15 +421,26 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
 
             if results[cnt]==1:
+                #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, c='r') #human
                 fig1.add_axes(ax)
             else:
+                #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, c='b') #object
                 fig1.add_axes(ax)
             cnt=cnt+1
         plt.pause(0.0001)
+        if metrics == 1:
+            if first_time:
+                annotations = np.array(results)
+                first_time = False
+            else:
+                annotations=np.hstack((annotations,np.array(results)))
+        #b={}
+        #b['annotations']=classification_array
+        #sio.savemat('classification_results',b);
 
 
 

@@ -38,7 +38,7 @@ Real time recongition of humans through laser scans
 		python merge_train.py video/
 
 	7)Test online with the previously created classifier by running 
-		python hpr_with_metrics.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10
+		python hpr.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10 0
 
 	8)In another terminal 
 		cd 
@@ -89,18 +89,9 @@ Runs the human pattern recognition (Naive Bayes) classifier.
 
 Command line use:
 
-	python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
+	python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>
 
-#V)hpr_with_metrics.py
-	
-Runs the human pattern recognition (Naive Bayes) classifier and generates a classification_results.mat file that contains its results.
-	
-
-Command line use :
-	
-	python hpr_with_metrics.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range>
-
-#VI)annotate_for_metrics.py
+#V)generate_metrics.py
 	
 Runs the mat file that the classifier was tested on, and lets the user annotate the same clusters as the classifier in order to generate
 some basic metrics (Precision, Recall, Accuracy).
@@ -108,29 +99,22 @@ some basic metrics (Precision, Recall, Accuracy).
 
 Command line use :
 	
-	python annotate_for_metrics.py </path/to/classification_results.mat>
+	python generate_metrics.py </path/to/classification_results.mat>
 
-#VII)offline_test.py :
+#VI)hpr_mat.py :
 Runs the specified classifier on a .mat file instead of a topic.
 
 Command line use :
 
-	python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
+	python hpr_mat.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls> <0_or_1_for_metrics>
 
-#VIII)offline_test_with_metrics.py :
-Runs the specified classifier on a .mat file instead of a topic, and generates a classification_results.mat file that contains its results.
-
-Command line use :
-
-	python offline_test_with_metrics.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>
-
-#IX)Library files
+#VII)Library files
 gridfit.py, myhog.py and mytools.py are libraries used to run the code. They were pre-written by others or ported to python.
 
-#X)online_calibration_node.py, optimal_test.py
+#VIII)online_calibration_node.py, optimal_test.py
 These two python files are not used anymore. They are still here just for legacy reasons and in case something new comes to our mind. You can freely ignore them.
 
-#XI)ideal_data.mat
+#IX)ideal_data.mat
 This .mat file contains the basic information regarding the laser scans. It is not used by any of our currently used scripts, but it's still here for the sake of completeness
 and future reference.
 

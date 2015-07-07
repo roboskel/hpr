@@ -30,6 +30,7 @@ w_index = 1
 limit = 40
 slot_count = 0
 
+metrics = 0
 first_time = True
 first_time_ranges = True
 data_path = ''
@@ -63,12 +64,13 @@ def offline_test():
     global slot_count, limit
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges
     
-    if not (len(sys.argv)==6):
+    if not (len(sys.argv)==7):
         print "###################################"
         print "You gave {0} arguments".format(len(sys.argv))
         print "Run using"
-        print ">python offline_test.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls>"
+        print ">python hpr_mat.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls> <0_or_1_for_metrics>"
         print "###################################"
+        exit()
     #INPUT MANAGEMENT    
     else:
         data_path = sys.argv[1]
@@ -118,7 +120,15 @@ def offline_test():
         wall_end = float(sys.argv[5])
         while not (RepresentsInt(wall_end) or RepresentsFloat(wall_end)):
             wall_end=input('Set frames for wall: ')
-            if RepresentsInt(timewindow):
+            if RepresentsInt(wall_end):
+                break
+            else:
+                print 'Try again'
+                
+        metrics = int(sys.argv[6])
+        while not (RepresentsInt(metrics) and metrics != 1 and metrics != 0):
+            wall_end=input('Create files that will be used for metrics? (1/0)')
+            if RepresentsInt(metrics):
                 break
             else:
                 print 'Try again'
@@ -183,12 +193,12 @@ def offline_test():
         filter = np.where(ranges <= wall) # remove walls
         ranges = ranges[filter]
         theta = phi[filter]
-        
-        if first_time_ranges:
-            ranges_= np.array(all_data[outer_index])[sampling]
-            first_time_ranges = False
-        else:
-            ranges_ = np.vstack((ranges_, np.array(all_data[outer_index])[sampling]))
+        if metrics == 1:
+            if first_time_ranges:
+                ranges_= np.array(all_data[outer_index])[sampling]
+                first_time_ranges = False
+            else:
+                ranges_ = np.vstack((ranges_, np.array(all_data[outer_index])[sampling]))
 
         print "Ranges : {0}".format(len(ranges))
         
@@ -219,25 +229,25 @@ def offline_test():
                     print "Clustering"
                     clustering(mybuffer)
 
-
-    b={}
-    b['timewindow']=int(timewindow)
-    b['range_limit']=range_limit
-    b['angle_increment']=angle_increment
-    #b['scan_time']=scan_time
-    b['angle_min']=angle_min
-    b['angle_max']=angle_max
-    b['intensities']=intensities
-    b['wall']=wall
-    print b['wall']
-    b['annotations']=annotations
-    b['ranges']=ranges_
-    try:
-        os.remove('classification_results.mat')
-    except OSError:
-        pass
-    sio.savemat('classification_results',b);
-    print "END"
+    if metrics == 1:
+        b={}
+        b['timewindow']=int(timewindow)
+        b['range_limit']=range_limit
+        b['angle_increment']=angle_increment
+        #b['scan_time']=scan_time
+        b['angle_min']=angle_min
+        b['angle_max']=angle_max
+        b['intensities']=intensities
+        b['wall']=wall
+        print b['wall']
+        b['annotations']=annotations
+        b['ranges']=ranges_
+        try:
+            os.remove('classification_results.mat')
+        except OSError:
+            pass
+        sio.savemat('classification_results',b);
+    print "D O N E !"
     
 def pol2cart(r,theta,zed):
 
@@ -382,11 +392,12 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             cnt=cnt+1
         plt.pause(0.0001)
         key_press = raw_input("Press a key to continue")
-        if first_time:
-            annotations = np.array(results)
-            first_time = False
-        else:
-            annotations=np.hstack((annotations,np.array(results)))
+        if metrics == 1:
+            if first_time:
+                annotations = np.array(results)
+                first_time = False
+            else:
+                annotations=np.hstack((annotations,np.array(results)))
 
 
 if __name__ == '__main__':
