@@ -1,15 +1,19 @@
 #Installation Instructions:
-Download scripts in an existing ROS-Node
+Download scripts in an existing ROS package
+
 Download needed libraries:
 
 	sudo apt-get install python-scipy python-sklearn
 
 Tested on R.O.S. Hydro, Ubuntu 12.04
+
 Python v. 2.7.3
+
 Scipy v. 0.9.0 
+
 Sklearn v. 0.10
 
-laser scanner f.o.v : +- 45 deg. , intensity publishing enabled(not yet used)
+laser scanner f.o.v : +- 45 deg. , intensity publishing enabled(not used yet)
 
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans

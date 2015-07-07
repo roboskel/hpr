@@ -145,8 +145,9 @@ def laser_listener():
                 break
             else:
                 print 'Try again'
+                
         metrics = int(sys.argv[6])
-        while not (RepresentsInt(metrics)):
+        while not (RepresentsInt(metrics) and metrics != '1' and metrics != '0'):
             metrics=input('Set maximum scan range in m: ')
             if RepresentsInt(metrics):
                 break

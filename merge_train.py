@@ -75,7 +75,7 @@ def DisplayClassifier():
     counts = np.bincount(np_ann_files)
     annot["humans"] = counts[1]
     annot["obstacles"] = counts[0]
-    sio.savemat('full_set_annotations', annot);
+    sio.savemat(path+"full_set_annotations", annot);
     
     #Create z-scored data
     temp = zscore(t_files)

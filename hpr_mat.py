@@ -126,8 +126,8 @@ def offline_test():
                 print 'Try again'
                 
         metrics = int(sys.argv[6])
-        while not (RepresentsInt(metrics) and metrics != 1 and metrics != 0):
-            wall_end=input('Create files that will be used for metrics? (1/0)')
+        while not (RepresentsInt(metrics) and metrics != '1' and metrics != '0'):
+            metrics=input('Set maximum scan range in m: ')
             if RepresentsInt(metrics):
                 break
             else:
