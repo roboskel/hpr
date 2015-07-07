@@ -114,7 +114,6 @@ def annotate_for_metrics():
     classifier_annotations = mat.get('annotations')
     max_index=len(all_data)
     mybuffer=all_data[0]
-    print"asasdasdasdasd"
     print timewindow
     limit=max_index/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
