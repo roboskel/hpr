@@ -457,7 +457,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             cnt=cnt+1
         plt.pause(0.0001)
 
-	pickle.dump(store_results, open('stored_predictions.p','a'))
+	pickle.dump(store_results, open('stored_predictions.p','a')
 	file_name=open('stored_predictions.txt','a')
 	file_name.write(str(store_results))
 	file_name.write("\n")
