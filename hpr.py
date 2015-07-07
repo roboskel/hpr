@@ -145,7 +145,7 @@ def laser_listener():
                 break
             else:
                 print 'Try again'
-                
+
         metrics = int(sys.argv[6])
         while not (RepresentsInt(metrics) and metrics != '1' and metrics != '0'):
             metrics=input('Set maximum scan range in m: ')
@@ -384,8 +384,9 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
     global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj
     global annotations, first_time
+    
     temp = []
-    #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because after an update on python it stopped working
+    #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because an update of python made it unusable
     
     #ZSCORE UPDATE
     #zscore the entire hogs table, not single cluster hogs
@@ -411,8 +412,13 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
         #temp2_zscore = temp2_zscore[np.logical_not(np.isnan(temp2_zscore))]    #remove NaNs from the matrix
         #temp2_zscore = pca_obj.transform(temp2_zscore)
         
+        temp_pca = pca_obj.transform(temp)
+        results = gaussian.predict(temp_pca)
+
+        #temp2_zscore = zscore(temp)
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
         #results = gaussian.predict(temp2_zscore)
-        results = gaussian.predict(temp)
         print results
         cnt=0
         for k in vcl:

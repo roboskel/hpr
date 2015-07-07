@@ -348,7 +348,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     global annotations, first_time
     
     temp=[]
-    temp2=np.empty(36)
+    #temp2=np.empty(36)             #Currently removed this way of calculating the zscore with temp2 because an update of python made it unusable
     
     if flag==1:
         kat.clear()
@@ -357,21 +357,25 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             #BEFORE
             temp = zscore(np.array(hogs)[0])
             #AFTER
-            temp2 = np.array(hogs)[0]
+            #temp2 = np.array(hogs)[0]
         else:
             #BEFORE
             for i in range(0,len(hogs)):
                 temp.append(zscore(np.array(hogs[i])))
             #AFTER
-            temp2 = np.array(hogs)
-            print temp2.shape
+            #temp2 = np.array(hogs)
+            #print temp2.shape
             
         #AFTER, zscore the array of size <# of clusters> x <#number of features>
         #temp2_zscore = zscore(temp2)
-        temp2_zscore = zscore(temp)
-        temp2_zscore = pca_obj.transform(temp2_zscore)
         
-        results = gau_classifier.predict(temp2_zscore)
+        temp_pca = pca_obj.transform(temp)
+        results = gau_classifier.predict(temp_pca)
+
+        #temp2_zscore = zscore(temp)
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
+        #results = gau_classifier.predict(temp2_zscore)
         print results
         cnt=0
         for k in vcl:

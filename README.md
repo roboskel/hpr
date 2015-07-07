@@ -5,15 +5,27 @@ Download needed libraries:
 
 	sudo apt-get install python-scipy python-sklearn
 
-Tested on R.O.S. Hydro, Ubuntu 12.04
+Tested on R.O.S. Hydro, 
 
-Python v. 2.7.3
+Ubuntu 12.04,
 
-Scipy v. 0.9.0 
+Python v. 2.7.3,
 
-Sklearn v. 0.10
+Scipy v. 0.9.0,
 
-laser scanner f.o.v : +- 45 deg. , intensity publishing enabled(not used yet)
+Sklearn v. 0.10,
+
+#Requirements:
+
+Laser scanner F.O.V : +- 45 deg.,
+
+Intensity publishing enabled(not used yet)
+
+RECOMMENDATIONS:
+	
+	1) Run the Sample Run first. It will help you understand what each .py does.
+	2) Use same timewindow, and wall set time for each training set, and use the same values when
+	evaluating.
 
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans
@@ -24,7 +36,7 @@ Real time recongition of humans through laser scans
 	2)Open a terminal and run 
 		roscore
 
-	3)On another terminal 
+	3)On another terminal run
 		cd 
 	  to the directory of the scripts
 
@@ -44,7 +56,7 @@ Real time recongition of humans through laser scans
 	7)Test online with the previously created classifier by running 
 		python hpr.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10 0
 
-	8)In another terminal 
+	8)On another terminal run
 		cd 
 	  to the directory of the scripts.
 
@@ -122,10 +134,4 @@ These two python files are not used anymore. They are still here just for legacy
 This .mat file contains the basic information regarding the laser scans. It is not used by any of our currently used scripts, but it's still here for the sake of completeness
 and future reference.
 
-
-RECOMMENDATIONS:
-	
-	1) Run the Sample Run first. It will help you understand what each .py does.
-	2) Use same timewindow, and wall set time for each training set, and use the same values when
-	evaluating.
     
