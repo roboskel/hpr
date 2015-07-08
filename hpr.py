@@ -4,6 +4,7 @@ __author__="athanasia sapountzi"
 import roslib, warnings, rospy, math, pickle, scipy.stats
 from gridfit import gridfit
 import numpy as np
+import scipy.spatial.distance as dist
 import scipy.io as sio
 import scipy.special
 import matplotlib.pyplot as plt
@@ -42,6 +43,8 @@ first_time_ranges = True
 sub_topic = 'scan'
 metrics = 0
 total_cluster_time = 0
+hogs_temp=[]
+flag_hogs=False
 
 #temp2 = np.zeros((1, 36))
 
@@ -388,10 +391,60 @@ def scatter_all(xi,yi,zi,cluster_labels):
 
     fig2.pause(0.00001)
 
+def euclidean_distance(v1, v2, flag):
+
+    list_dist = []
+    min_dist = -1.0
+    index=0
+
+    
+    if isinstance(v1, list) & flag==False:
+        for i in range(0,len(v1)):
+	    for j in range(0,len(v2)):
+	        distance = dist.euclidean(np.array(v1)[i],np.array(v2)[j])
+
+	        if min_dist == -1.0:
+		    min_dist=distance
+		    index=j
+	        elif distance <= min_dist:
+		    min_dist=distance
+		    index=j
+
+	    list_dist.append(index)
+	    index=0
+	    min_dist=-1.0
+    if not isinstance(v1, list):
+	for j in range(0,len(v2)):
+	    distance = dist.euclidean(v1,np.array(v2)[j])
+
+	    if min_dist == -1.0:
+		min_dist=distance
+		index=j
+	    elif distance <= min_dist:
+		min_dist=distance
+		index=j
+
+	list_dist.append(index)
+    if flag==True:
+	for j in range(0,len(v1)):
+	    distance = dist.euclidean(np.array(v1)[j],v2)
+
+	    if min_dist == -1.0:
+		min_dist=distance
+		index=j
+	    elif distance <= min_dist:
+		min_dist=distance
+		index=j
+
+	list_dist.append(index)
+
+    return list_dist
+
+
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     
-    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj
-    global annotations, first_time
+    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj, hogs_temp
+    global annotations, first_time, flag_hogs
     
     temp = []
     store_results = []
@@ -421,17 +474,41 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
         #temp2_zscore = temp2_zscore[np.logical_not(np.isnan(temp2_zscore))]    #remove NaNs from the matrix
         #temp2_zscore = pca_obj.transform(temp2_zscore)
         
-        temp_pca = pca_obj.transform(temp)
-        results = gaussian.predict(temp_pca)
+        
 
         #temp2_zscore = zscore(temp)
         #temp2_zscore = pca_obj.transform(temp2_zscore)
         
         #results = gaussian.predict(temp2_zscore)
+
+	list_dist = []
+	if len(hogs_temp) != 0:
+	    if not isinstance(temp, list):
+		if flag_hogs==True:
+		    list_dist.append(0)
+		else:
+	            list_dist=euclidean_distance(temp,hogs_temp, flag_hogs)
+	    else:
+	        list_dist=euclidean_distance(temp,hogs_temp, flag_hogs)
+
+	if len(list_dist)==0:
+	    list_dist.append(0)	
+
+	temp_pca = pca_obj.transform(temp)
+        results = gaussian.predict(temp_pca)
         print results
+
         cnt=0
+	list_len=0
+	col=0
+	col_list=[]
 
         for k in vcl:
+
+	    if list_len>=len(list_dist):
+		col=list_len
+	    else:
+		col=list_dist[list_len]
 
             filter=np.where(cluster_labels==k)
             
@@ -440,12 +517,12 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
             if results[cnt]==1:
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
-                ax.scatter(x,y, zed, 'z', 30, c='r') #human
+                ax.scatter(x,y, zed, 'z', 30, cc[col%12]) #human
                 fig1.add_axes(ax)
             else:
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
-                ax.scatter(x,y, zed, 'z', 30, c='b') #object
+                ax.scatter(x,y, zed, 'z', 30, cc[col%12]) #object
                 fig1.add_axes(ax)
 
 	    #add to a struct the classification prediction and the point cloud of the respective cluster
@@ -455,6 +532,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
 	    store_results[cnt].append(np.array([x,y,zed]))
 
             cnt=cnt+1
+	    list_len=list_len+1
         plt.pause(0.0001)
 
 	pickle.dump(store_results, open('stored_predictions.p','a'))
@@ -469,7 +547,15 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 first_time = False
             else:
                 annotations=np.hstack((annotations,np.array(results)))
-        #b={}
+
+	if isinstance(temp, list):
+	    flag_hogs=False
+	else:
+	    flag_hogs=True
+
+	hogs_temp = np.array(np.array(temp))
+        
+	#b={}
         #b['annotations']=classification_array
         #sio.savemat('classification_results',b);
 
