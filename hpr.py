@@ -17,7 +17,7 @@ from os.path import isfile, join, splitext
 from myhog import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
-
+from scipy import interpolate
 from sklearn.decomposition import PCA
 
 ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
@@ -45,6 +45,7 @@ metrics = 0
 total_cluster_time = 0
 hogs_temp=[]
 flag_hogs=False
+scan_pieces=5
 
 #temp2 = np.zeros((1, 36))
 
@@ -199,9 +200,11 @@ def laser_listener():
 
 def online_test(laser_data):
     global wall_flag, wall, fr_index, intens, w_index, phi, sampling, limit #prosthesa to limit edw giati den to epairne global
-    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1, kat
-    global pca_obj
+    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1,fig3, kat, center
+    global pca_obj, pca_plot
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges, total_cluster_time
+    global mybuffer2, num_c
+
 
     millis_start = int(round(time.time() * 1000))
     if wall_flag == 0:
@@ -239,13 +242,14 @@ def online_test(laser_data):
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag = 1
-            kat,ax=initialize_plots(wall_cart)
-            #kat=initialize_plots(wall_cart)
+            center,kat,ax=initialize_plots(wall_cart)
+
             angle_increment=laser_data.angle_increment
             scan_time=laser_data.scan_time
             angle_min=laser_data.angle_min
             angle_max=laser_data.angle_max
             intensities=laser_data.intensities
+	    angle_prev=angle_min
             print 'walls set...'
         
     else:
@@ -266,19 +270,29 @@ def online_test(laser_data):
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
             #print "-------------- 6"
             C = np.array(pol2cart(ranges,theta,z) ) #convert to Cartesian
+	    #print 'C = {}'.format(C)
+
 
             if (fr_index ==1 ):
                 mybuffer = C #mybuffer is the cartesian coord of the first scan
+		mybuffer2 = [C]
+		num_c = np.array(len(C))
+	
             else :
                 mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
+		mybuffer2.append((mybuffer2,[C]))
+		num_c=np.vstack((num_c,len(C)))
 
             if (fr_index == timewindow ):
-
+		#print 'mybuffer[:,0] = {}'.format(mybuffer[:,0])
                 mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
                 mybuffer=mybuffer[np.where( mybuffer[:,0] < 5),:][0]#ignore distant points
 
+
                 if len(mybuffer>3): #at least 3 points are needed to form a cluster
-                    clustering(mybuffer)
+                    #clustering(mybuffer, num_c)
+		    cluster_into_pieces(mybuffer, num_c)
+ 
                 fr_index=0
                 z=- z_scale
             z = z + z_scale
@@ -322,7 +336,13 @@ def loadfiles():
     return classifier, pca_obj
 
 def initialize_plots(wall_cart):
-    global fig1
+    global fig1,fig3
+
+    fig3=plt.figure()
+    plot2d1= fig3.gca(projection='3d')
+    plot2d1.set_xlabel('X - Distance')
+    plot2d1.set_ylabel('Y - Robot')
+    plot2d1.set_zlabel('Z - time')
 
     temp=plt.figure()
     plot2d = temp.add_subplot(111)
@@ -337,14 +357,81 @@ def initialize_plots(wall_cart):
     plot3d.set_zlabel('Z - time')
 
     plt.show()
-    return plot2d,plot3d
+    return plot2d1,plot2d,plot3d
 
-def clustering(clear_data):
 
-    global cc, ccnames, fig1
+def extract_features(array_pieces):
+
+    first_time=True
+
+    #print 'size = {} , array: {}'.format(len(array_pieces), array_pieces)
+    #print 'size {} array = {}'.format(len(array_pieces), array_pieces)
+
+    #for i in range(0,len(array_pieces)):
+    [xi,yi]=[array_pieces[0][0], array_pieces[0][1]]
+	#print 'xi = {}'.format([xi,yi])
+
+
+    #if first_time:
+    xmin=min(xi)
+    xmax=max(xi)
+    ymin=min(yi)
+    ymax=max(yi)
+	    
+    xmean=np.mean(xi)
+    num_xi=len(xi)
+    num_yi=len(yi)
+    ymean=np.mean(yi)
+
+    sum_deviation = 0.0
+    for i in range(0,len(xi)) :
+	sum_deviation=sum_deviation+ math.pow(xi[i]-xmean,2)+ math.pow(yi[i]-ymean,2)
+
+    standard_deviation=math.sqrt(sum_deviation/len(xi))
+    '''
+    else:
+	if xmin>=min(xi):
+	    xmin=min(xi)
+	if xmax<=max(xi):
+	    xmax=max(xi)
+	if ymin>=min(yi):
+	    ymin=min(yi)
+	if ymax<=max(yi):
+	    ymax=max(yi)
+    
+
+	xmean=xmean+np.mean(xi)
+	num_xi=num_xi+len(xi)
+	ymean=ymean+np.mean(yi)
+	num_yi=num_yi+len(yi)
+    '''
+
+    
+
+    #print 'xmin {} xmax {} ymin {} ymax {} xmean {} ymean {} numxi {} num yi {} standard_deviation = {}'.format(xmin,xmax,ymin,ymax, xmean/num_xi, ymean/num_yi, num_xi, num_yi, standard_deviation)
+
+
+def cluster_into_pieces(clear_data, num_c):
+
+
+    global cc, ccnames, fig1, z, z_scale, center,fig3, kat, wall_cart
+    global scan_pieces
+    
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
+    centerx=[]
+    centery=[]
+    centerz=[]
+    centerk=[]
+    centerx_list=[]
+    centery_list=[]
+    centerz_list=[]
+    centertot_list=[]
+    array_pieces=[]
+    point_slots=[]
     colors=[]
+    flag_x=False
+    flag_y=False
     vcl=[] #Valid Cluster Labels 
     valid_flag=0 #this flag is only set if we have at leat one valid cluster
     Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
@@ -352,17 +439,251 @@ def clustering(clear_data):
     #print 'Eps = ', Eps, ', outliers=' ,len(np.where(cluster_labels==-1))
     max_label=int(np.amax(cluster_labels))
 
+
+    #print 'cl = {}'.format(clear_data)
     [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
+    
+    xii = []
+    yii=[]
+    zii=[]
+    clear_data1 =sorted(clear_data, key=lambda xs: xs[0])
+    for i in range(0,len(clear_data1)) :
+	xii.append(clear_data1[i][0])
+	yii.append(clear_data1[i][1])
+	zii.append(clear_data1[i][2])
+
+
+    #tck =interpolate.BarycentricInterpolator(xi, yi)
+    #t = interpolate.PiecewisePolynomial(xi,yi)
+    #tck=interpolate.splrep(xi,yi)
+    #print '!!!! tck = {}'.format(tck)
+    #print '!!!! t = {}'.format(t)
+
+    s = interpolate.splrep(xii, yii)
+    print 's {}'.format(s)
+    
+    # calculate polynomial
+    zp = np.polyfit(xi, yi, 3)
+    f = np.poly1d(zp)
+
+    # calculate new x's and y's
+    x_new = np.linspace(xi[0], xi[-1], 50)
+    y_new = f(x_new)
+    #print 'xnew {} ynew {}'.format(x_new,y_new)
+    plt.plot(xi,yi,'o',x_new,f(x_new))
+    plt.show()
+    
+
+    #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
     fig1.clear()
+    fig3.clear()
+    #print 'into clustering: [xi,yi,zi] = {}'.format([xi,yi,zi])
+    
+    #print '[xk,yk] {} '.format([xk,yk])
     
     #scatter_all(xi,yi,zi,cluster_labels)#optional 3d scatter plot of all clusters
+    prev=0
+    '''
+    for p in range(0,len(num_c)):
+	pp=num_c[p]
+	print '!!! pp = {} , [xp,yp,zp]={}'.format(pp,num_c)
+    '''
+    pp=0
+    p_prev=0
+    for p in range(0,len(num_c),scan_pieces):
+	for t in range(p_prev,p):
+	    pp=pp+num_c[t]
 
+	p_prev=p
+	[xp,yp,zp]=[clear_data[prev:prev+pp-1:1,0], clear_data[prev:prev+pp-1:1,1], clear_data[prev:prev+pp-1:1,2]]
+	#print 'pp = {} p_prev = {}'.format(pp, p_prev)
+	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
+	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
+	
+	cl_labels = cluster_labels[prev:prev+pp-1:1]
+	#print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+
+        max_cl = int(np.amax(cl_labels))
+	for k in range(1,max_cl+1) :
+	    filter=np.where(cl_labels==k)
+	    #print 'filter {} '.format(filter)
+	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
+	    #print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	    point_slots.append([xk,yk])
+	    #print 'point_slots {} '.format(point_slots)
+	    
+	    if len(xk)!=0 and len(yk)!=0 and len(zk)!=0:
+		
+	    	if len(xk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(xk))
+	    	if len(yk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(yk))
+	    	if len(zk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(zk))
+
+	    	#print 'centerk = {}'.format(centerk)
+	    	centerz_list.append(centerk)
+	    	centerk=[]
+
+	    	#get features of a cluster piece, where its points are extracted at each 'scan_pieces' scans
+	    	extract_features(point_slots)
+	    	point_slots=[]
+	pp=0
+	prev=pp+prev
+	centertot_list.append(centerz_list)
+	centerz_list = []
+
+
+
+def clustering2(clear_data, num_c):
+
+    global cc, ccnames, fig1, z, z_scale, center,fig3
+    
+    #warnings.filterwarnings("ignore", category=DeprecationWarning)
+    hogs=[]
+    centerx=[]
+    centery=[]
+    centerz=[]
+    centerk=[]
+    centerx_list=[]
+    centery_list=[]
+    centerz_list=[]
+    centertot_list=[]
+    array_pieces=[]
+    point_slots=[]
+    colors=[]
+    flag_x=False
+    flag_y=False
+    vcl=[] #Valid Cluster Labels 
+    valid_flag=0 #this flag is only set if we have at leat one valid cluster
+    Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
+    #print  len(clear_data),' points in ', np.amax(cluster_labels),'clusters'
+    #print 'Eps = ', Eps, ', outliers=' ,len(np.where(cluster_labels==-1))
+    max_label=int(np.amax(cluster_labels))
+
+
+
+    [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
+    #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
+    fig1.clear()
+    fig3.clear()
+    #print 'into clustering: [xi,yi,zi] = {}'.format([xi,yi,zi])
+    
+    #print '[xk,yk] {} '.format([xk,yk])
+    
+    #scatter_all(xi,yi,zi,cluster_labels)#optional 3d scatter plot of all clusters
+    prev=0
+    '''
+    for p in range(0,len(num_c)):
+	pp=num_c[p]
+	print '!!! pp = {} , [xp,yp,zp]={}'.format(pp,num_c)
+    '''
+
+    for p in range(0,len(num_c)):
+	pp=num_c[p]
+	[xp,yp,zp]=[clear_data[prev:prev+pp-1:1,0], clear_data[prev:prev+pp-1:1,1], clear_data[prev:prev+pp-1:1,2]]
+	print 'pp = ',pp
+	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
+	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
+	
+	cl_labels = cluster_labels[prev:prev+pp-1:1]
+	#print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+
+        max_cl = int(np.amax(cl_labels))
+	for k in range(1,max_cl+1) :
+	    filter=np.where(cl_labels==k)
+	    #print 'filter {} '.format(filter)
+	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
+	    print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	    point_slots.append([xk,yk])
+	    #print 'point_slots {} '.format(point_slots)
+	    
+	    if len(xk)==0 & len(yk==0) & len(zk)==0:
+		continue
+	    
+	    else:
+		if len(xk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(xk))
+	    	if len(yk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(yk))
+	    	if len(zk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(zk))
+	    #print 'centerk = {}'.format(centerk)
+	    centerz_list.append(centerk)
+	    centerk=[]
+	
+	extract_features(point_slots)
+	
+	prev=pp+prev
+
+	centertot_list.append(centerz_list)
+	centerz_list = []
+
+    
+    #print 'centertot_list = {}'.format(centertot_list)
+    
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
+	    #print 'xi[filter] {} \n yi[filter] {}\n zi[filter] {}'.format(xi[filter],yi[filter], zi[filter])
+	   
             #ax.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k-1]) #this can be commented out
             valid_flag=1
             #print 'extracting surface for ',ccnames[k-1],' cluster '
+
+	    #points of every cluster at each timewindow
+	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
+	    #print '[xk,yk,zk] {}'.format([xk,yk,zk])
+	    '''
+	    for j in np.arange(0,z,z_scale):
+		flag_x=False
+		flag_y=False
+		
+	    	zfilter=np.where(zk==j)
+
+		try:
+		    #get (x,y) points at each timeslot
+    	    	    [xj,yj]=[xk[zfilter],yk[zfilter]]
+
+	    	    #print '[xj,yj] {}'.format([xj,yj])
+		    #get the centroid
+		    if len(xj)!=0:
+		    	centerx.append(np.mean(xj))
+			#print 'put the xj = {}'.format(np.mean(xj))
+			flag_x=True
+		    if len(yj)!=0:
+		    	centery.append(np.mean(yj))
+			#print 'put the yj = {}'.format(np.mean(yj))
+			flag_y=True
+		    if flag_x==True & flag_y==True:
+			centerz.append(j)
+			#print 'put the j = {}'.format(j)
+			array_pieces.append([xj,yj])
+		except IndexError:
+		    break
+
+	    extract_features(array_pieces)
+	    #centerx_list contains the lists of centroids of each cluster at each timeslot
+	    centerx_list.append(centerx)
+	    centery_list.append(centery)
+	    centerz_list.append(centerz)
+	    centerx = []
+	    centery=[]
+	    centerz=[]
+	    '''
+	    
             vcl.append(k)
             colors.append(ccnames[k%12])
             grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
@@ -370,9 +691,131 @@ def clustering(clear_data):
             hogs.append(hog(grid))  #extract hog features
 
     fig1.show()
+    fig3.show()
+    #print 'centerx = {} , centery={}'.format(centerx_list,centery_list)
+
+    #update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
+  
+
+def clustering(clear_data, num_c):
+
+    global cc, ccnames, fig1, z, z_scale, center,fig3
     
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl)
+    #warnings.filterwarnings("ignore", category=DeprecationWarning)
+    hogs=[]
+    centerx=[]
+    centery=[]
+    centerz=[]
+    centerx_list=[]
+    centery_list=[]
+    centerz_list=[]
+    colors=[]
+    flag_x=False
+    flag_y=False
+    vcl=[] #Valid Cluster Labels 
+    valid_flag=0 #this flag is only set if we have at leat one valid cluster
+    Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
+    #print  len(clear_data),' points in ', np.amax(cluster_labels),'clusters'
+    #print 'Eps = ', Eps, ', outliers=' ,len(np.where(cluster_labels==-1))
+    max_label=int(np.amax(cluster_labels))
+
+    #print 'clear data = {}'.format(clear_data)
+    ss=0
+    for s in range(0,len(num_c)):
+	ss=ss+num_c[s]
+    print 'num point {} num_c {}'.format(len(clear_data),ss)
+    print 'cluster_labels={} max_label={}'.format(cluster_labels,max_label)
+
+    [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
+    #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
+    fig1.clear()
+    fig3.clear()
+    #print 'into clustering: [xi,yi,zi] = {}'.format([xi,yi,zi])
     
+    #print '[xk,yk] {} '.format([xk,yk])
+    
+    #scatter_all(xi,yi,zi,cluster_labels)#optional 3d scatter plot of all clusters
+    prev=0
+    for p in range(0,len(num_c)):
+	pp=num_c[p]
+	[xp,yp,zp]=[clear_data[prev:prev+pp:1,0], clear_data[prev:prev+pp:1,1], clear_data[prev:prev+pp:1,2]]
+	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
+	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
+	cl_labels = cluster_labels[prev:prev+pp:1]
+	print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+	for k in range(1,int(np.amax(cl_labels))) :
+	    filter=np.where(cl_labels==k)
+	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
+	    print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	
+	prev=pp
+
+
+
+    for k in range(1,max_label+1) :
+        filter=np.where(cluster_labels==k)
+        if len(filter[0])>40 :
+	    #print 'xi[filter] {} \n yi[filter] {}\n zi[filter] {}'.format(xi[filter],yi[filter], zi[filter])
+	   
+            #ax.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k-1]) #this can be commented out
+            valid_flag=1
+            #print 'extracting surface for ',ccnames[k-1],' cluster '
+
+	    #points of every cluster at each timewindow
+	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
+	    #print '[xk,yk,zk] {}'.format([xk,yk,zk])
+	    for j in np.arange(0,z,z_scale):
+		flag_x=False
+		flag_y=False
+		
+	    	zfilter=np.where(zk==j)
+
+		try:
+		    #get (x,y) points at each timeslot
+    	    	    [xj,yj]=[xk[zfilter],yk[zfilter]]
+
+	    	    #print '[xj,yj] {}'.format([xj,yj])
+		    #get the centroid
+		    if len(xj)!=0:
+		    	centerx.append(np.mean(xj))
+			#print 'put the xj = {}'.format(np.mean(xj))
+			flag_x=True
+		    if len(yj)!=0:
+		    	centery.append(np.mean(yj))
+			#print 'put the yj = {}'.format(np.mean(yj))
+			flag_y=True
+		    if flag_x==True & flag_y==True:
+			centerz.append(j)
+			#print 'put the j = {}'.format(j)
+
+		except IndexError:
+		    break
+
+	    print 'centerx = {} , centery={} , centerz={}'.format(centerx,centery,centerz)
+	    #centerx_list contains the lists of centroids of each cluster at each timeslot
+	    centerx_list.append(centerx)
+	    centery_list.append(centery)
+	    centerz_list.append(centerz)
+	    centerx = []
+	    centery=[]
+	    centerz=[]
+	    
+            vcl.append(k)
+            colors.append(ccnames[k%12])
+            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+            grid=grid-np.amin(grid)
+            hogs.append(hog(grid))  #extract hog features
+
+    fig1.show()
+    fig3.show()
+    #print 'centerx = {} , centery={}'.format(centerx_list,centery_list)
+
+    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list,centerz_list)
+  
+
+
+
+
 def scatter_all(xi,yi,zi,cluster_labels):
     
     global cc
@@ -441,11 +884,11 @@ def euclidean_distance(v1, v2, flag):
     return list_dist
 
 
-def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
+def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list,centerz_list):
     
-    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj, hogs_temp
+    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, pca_plot, center, fig3
     global annotations, first_time, flag_hogs
-    
+
     temp = []
     store_results = []
     #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because an update of python made it unusable
@@ -455,6 +898,11 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
     if flag==1:
         kat.clear()
         kat.plot(wall_cart[:,0],wall_cart[:,1])
+
+	#center.clear()
+    	#center.plot(wall_cart[:,0],wall_cart[:,1])
+        print 'centerx_list = {} , centery_list={} , centerz_list={}'.format(centerx_list,centery_list,centerz_list)
+
         if np.array(hogs).shape==(1,36):
             #BEFORE
             temp = zscore(np.array(hogs)[0])
@@ -480,7 +928,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
         #temp2_zscore = pca_obj.transform(temp2_zscore)
         
         #results = gaussian.predict(temp2_zscore)
-
+	#print 'TEMP {}'.format(temp)
 	list_dist = []
 	if len(hogs_temp) != 0:
 	    if not isinstance(temp, list):
@@ -497,11 +945,16 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
 	temp_pca = pca_obj.transform(temp)
         results = gaussian.predict(temp_pca)
         print results
+	print list_dist
+	#print 'temp = {}'.format(temp)
+	#print 'pca = {} temp_pca[0,:] {}'.format(temp_pca, temp_pca[0,:])
 
         cnt=0
 	list_len=0
 	col=0
 	col_list=[]
+
+	
 
         for k in vcl:
 
@@ -525,6 +978,10 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
                 ax.scatter(x,y, zed, 'z', 30, cc[col%12]) #object
                 fig1.add_axes(ax)
 
+	    center.scatter(centerx_list[cnt],centery_list[cnt],centerz_list[cnt], 'z', 30, c=cc[k%12])
+	    fig3.add_axes(center)
+
+	    #fig1.add_axes(pca_plot)
 	    #add to a struct the classification prediction and the point cloud of the respective cluster
 	    
 	    store_results.append([])
@@ -559,6 +1016,153 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl):
         #b['annotations']=classification_array
         #sio.savemat('classification_results',b);
 
+
+def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
+    
+    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, pca_plot, center, fig3
+    global annotations, first_time, flag_hogs
+
+    temp = []
+    store_results = []
+    centerx = []
+    centery = []
+    centerz = []
+    #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because an update of python made it unusable
+    
+    #ZSCORE UPDATE
+    #zscore the entire hogs table, not single cluster hogs
+    if flag==1:
+        kat.clear()
+        kat.plot(wall_cart[:,0],wall_cart[:,1])
+
+	#center.clear()
+    	#center.plot(wall_cart[:,0],wall_cart[:,1])
+        
+        if np.array(hogs).shape==(1,36):
+            #BEFORE
+            temp = zscore(np.array(hogs)[0])
+            #AFTER
+            #temp2 = np.array(hogs)[0]
+        else:
+            #BEFORE
+            for i in range(0,len(hogs)):
+                temp.append(zscore(np.array(hogs[i])))
+            #AFTER
+            #temp2 = np.array(hogs)
+            #print temp2.shape
+        
+        #AFTER, zscore the array of size <# of clusters> x <#number of features>
+
+        #temp2_zscore = zscore(temp2)
+        #temp2_zscore = temp2_zscore[np.logical_not(np.isnan(temp2_zscore))]    #remove NaNs from the matrix
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
+        
+
+        #temp2_zscore = zscore(temp)
+        #temp2_zscore = pca_obj.transform(temp2_zscore)
+        
+        #results = gaussian.predict(temp2_zscore)
+	#print 'TEMP {}'.format(temp)
+	list_dist = []
+	if len(hogs_temp) != 0:
+	    if not isinstance(temp, list):
+		if flag_hogs==True:
+		    list_dist.append(0)
+		else:
+	            list_dist=euclidean_distance(temp,hogs_temp, flag_hogs)
+	    else:
+	        list_dist=euclidean_distance(temp,hogs_temp, flag_hogs)
+
+	if len(list_dist)==0:
+	    list_dist.append(0)	
+
+	temp_pca = pca_obj.transform(temp)
+        results = gaussian.predict(temp_pca)
+        print results
+	print list_dist
+	#print 'temp = {}'.format(temp)
+	#print 'pca = {} temp_pca[0,:] {}'.format(temp_pca, temp_pca[0,:])
+
+        cnt=0
+	list_len=0
+	col=0
+	col_list=[]
+
+	
+
+        for k in vcl:
+
+	    if list_len>=len(list_dist):
+		col=list_len
+	    else:
+		col=list_dist[list_len]
+
+            filter=np.where(cluster_labels==k)
+            
+            [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
+
+            if results[cnt]==1:
+                #classification_array.append(1)
+                kat.scatter(x,y,s=20, c='r')
+                ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #human
+                fig1.add_axes(ax)
+            else:
+                #classification_array.append(0)
+                kat.scatter(x,y,s=20, c='b')
+                ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #object
+                fig1.add_axes(ax)
+	    
+	    for t in range(0,len(centertot_list)) :
+		try:
+		    centerx.append(centertot_list[t][cnt][0])
+		    centery.append(centertot_list[t][cnt][1])
+		    centerz.append(centertot_list[t][cnt][2])
+		except IndexError:
+		    break;
+		
+	    print 'centerx {} , centery{} , centerz {}'.format(centerx, centery, centerz)
+	    center.scatter(centerx,centery,centerz, 'z', 30, c=cc[k%12])
+	    fig3.add_axes(center)
+
+	    #fig1.add_axes(pca_plot)
+	    #add to a struct the classification prediction and the point cloud of the respective cluster
+	    '''
+	    store_results.append([])
+	    store_results[cnt].append(results[cnt])
+	    store_results[cnt].append(np.array([x,y,zed]))
+	    '''
+            cnt=cnt+1
+	    list_len=list_len+1
+            centerx = []
+            centery = []
+            centerz = []
+
+        plt.pause(0.20)
+
+	pickle.dump(store_results, open('stored_predictions.p','a'))
+	file_name=open('stored_predictions.txt','a')
+	file_name.write(str(store_results))
+	file_name.write("\n")
+	file_name.close()
+
+        if metrics == 1:
+            if first_time:
+                annotations = np.array(results)
+                first_time = False
+            else:
+                annotations=np.hstack((annotations,np.array(results)))
+
+	if isinstance(temp, list):
+	    flag_hogs=False
+	else:
+	    flag_hogs=True
+
+	hogs_temp = np.array(np.array(temp))
+        
+	#b={}
+        #b['annotations']=classification_array
+        #sio.savemat('classification_results',b);
 
 
 if __name__ == '__main__':
