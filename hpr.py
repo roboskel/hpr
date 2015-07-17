@@ -46,6 +46,7 @@ total_cluster_time = 0
 hogs_temp=[]
 flag_hogs=False
 scan_pieces=5
+pol_degree=4
 
 #temp2 = np.zeros((1, 36))
 
@@ -200,7 +201,7 @@ def laser_listener():
 
 def online_test(laser_data):
     global wall_flag, wall, fr_index, intens, w_index, phi, sampling, limit #prosthesa to limit edw giati den to epairne global
-    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1,fig3, kat, center
+    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1,fig3, kat, center,curve
     global pca_obj, pca_plot
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges, total_cluster_time
     global mybuffer2, num_c
@@ -242,7 +243,7 @@ def online_test(laser_data):
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag = 1
-            center,kat,ax=initialize_plots(wall_cart)
+            center,kat,curve,ax=initialize_plots(wall_cart)
 
             angle_increment=laser_data.angle_increment
             scan_time=laser_data.scan_time
@@ -259,6 +260,7 @@ def online_test(laser_data):
         filter = np.where(ranges < wall) # filter out walls
         ranges = ranges[filter]
         theta = phi[filter]
+
 
         if metrics == 1:
             if first_time_ranges:
@@ -290,8 +292,9 @@ def online_test(laser_data):
 
 
                 if len(mybuffer>3): #at least 3 points are needed to form a cluster
-                    #clustering(mybuffer, num_c)
-		    cluster_into_pieces(mybuffer, num_c)
+                    #clustering2(mybuffer, num_c)
+		    clustering_procedure(mybuffer, num_c)
+		    #cluster_into_pieces(mybuffer, num_c)
  
                 fr_index=0
                 z=- z_scale
@@ -350,6 +353,12 @@ def initialize_plots(wall_cart):
     plot2d.set_ylabel('Robot is here')
     plot2d.plot(wall_cart[:,0],wall_cart[:,1])
 
+    temp1=plt.figure()
+    plot2d2 = temp1.add_subplot(111)
+    plot2d2.set_xlabel('Vertical distance')
+    plot2d2.set_ylabel('Robot is here')
+    plot2d2.plot(wall_cart[:,0],wall_cart[:,1])
+
     fig1=plt.figure()
     plot3d= fig1.gca(projection='3d')
     plot3d.set_xlabel('X - Distance')
@@ -357,7 +366,58 @@ def initialize_plots(wall_cart):
     plot3d.set_zlabel('Z - time')
 
     plt.show()
-    return plot2d1,plot2d,plot3d
+    return plot2d1,plot2d,plot2d2,plot3d
+
+
+def extract_main_features(point_cloud):
+
+    first_time=True
+
+    #print 'size = {} , array: {}'.format(len(array_pieces), array_pieces)
+    #print 'size {} array = {}'.format(len(array_pieces), array_pieces)
+
+    #for i in range(0,len(array_pieces)):
+    [xi,yi]=[point_cloud[0], point_cloud[1]]
+
+
+    #if first_time:
+    xmin=min(xi)
+    xmax=max(xi)
+    ymin=min(yi)
+    ymax=max(yi)
+	    
+    xmean=np.mean(xi)
+    num_xi=len(xi)
+    num_yi=len(yi)
+    ymean=np.mean(yi)
+
+    sum_deviation = 0.0
+    for i in range(0,len(xi)) :
+	sum_deviation=sum_deviation+ math.pow(xi[i]-xmean,2)+ math.pow(yi[i]-ymean,2)
+
+    standard_deviation=math.sqrt(sum_deviation/len(xi))
+    '''
+    else:
+	if xmin>=min(xi):
+	    xmin=min(xi)
+	if xmax<=max(xi):
+	    xmax=max(xi)
+	if ymin>=min(yi):
+	    ymin=min(yi)
+	if ymax<=max(yi):
+	    ymax=max(yi)
+    
+
+	xmean=xmean+np.mean(xi)
+	num_xi=num_xi+len(xi)
+	ymean=ymean+np.mean(yi)
+	num_yi=num_yi+len(yi)
+    '''
+
+    return xmin,xmax,ymin,ymax,xmean,ymean,standard_deviation
+
+    #print 'xmin {} xmax {} ymin {} ymax {} xmean {} ymean {} numxi {} num yi {} standard_deviation = {}'.format(xmin,xmax,ymin,ymax, xmean/num_xi, ymean/num_yi, num_xi, num_yi, standard_deviation)
+
 
 
 def extract_features(array_pieces):
@@ -411,11 +471,12 @@ def extract_features(array_pieces):
     #print 'xmin {} xmax {} ymin {} ymax {} xmean {} ymean {} numxi {} num yi {} standard_deviation = {}'.format(xmin,xmax,ymin,ymax, xmean/num_xi, ymean/num_yi, num_xi, num_yi, standard_deviation)
 
 
+
 def cluster_into_pieces(clear_data, num_c):
 
 
     global cc, ccnames, fig1, z, z_scale, center,fig3, kat, wall_cart
-    global scan_pieces
+    global scan_pieces, curve
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -445,22 +506,46 @@ def cluster_into_pieces(clear_data, num_c):
     
     xii = []
     yii=[]
+    yipol=[]
     zii=[]
     clear_data1 =sorted(clear_data, key=lambda xs: xs[0])
     for i in range(0,len(clear_data1)) :
 	xii.append(clear_data1[i][0])
 	yii.append(clear_data1[i][1])
+	yipol.append([clear_data1[i][1]])
 	zii.append(clear_data1[i][2])
 
-
     #tck =interpolate.BarycentricInterpolator(xi, yi)
-    #t = interpolate.PiecewisePolynomial(xi,yi)
+    t = interpolate.PiecewisePolynomial(xii,yipol)
     #tck=interpolate.splrep(xi,yi)
     #print '!!!! tck = {}'.format(tck)
     #print '!!!! t = {}'.format(t)
 
-    s = interpolate.splrep(xii, yii)
-    print 's {}'.format(s)
+    '''
+    new_length = len(xii)
+    new_x = np.linspace(min(xii), max(xii), new_length)
+    new_y = interpolate.interp1d(xii, yii, kind='cubic')(new_x)
+    '''
+    #fitting curve
+    coefficients = np.polyfit(xii, yii, 6)
+    polynomial = np.poly1d(coefficients)
+
+    xs = np.arange(-2.2, 2.6, 0.1)
+    ys = polynomial(xs)
+
+    f=interpolate.SmoothBivariateSpline(clear_data)
+    cof = f.get_coeffs()
+    print 'f = {} coefs= {}'.format(f,cof)
+
+
+
+    '''
+    #splines
+    f = interpolate.interp1d(xii,yii, kind='cubic')
+    x_new = np.array([0])
+    y_new=f(x_new)
+
+    #print 'new_x {} new_y {}'.format(new_x, new_y)
     
     # calculate polynomial
     zp = np.polyfit(xi, yi, 3)
@@ -472,6 +557,7 @@ def cluster_into_pieces(clear_data, num_c):
     #print 'xnew {} ynew {}'.format(x_new,y_new)
     plt.plot(xi,yi,'o',x_new,f(x_new))
     plt.show()
+    '''
     
 
     #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
@@ -539,11 +625,11 @@ def cluster_into_pieces(clear_data, num_c):
 	centertot_list.append(centerz_list)
 	centerz_list = []
 
-
+    #update_plots2():
 
 def clustering2(clear_data, num_c):
 
-    global cc, ccnames, fig1, z, z_scale, center,fig3
+    global cc, ccnames, fig1, z, z_scale, center,fig3, scan_pieces
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -585,6 +671,73 @@ def clustering2(clear_data, num_c):
 	print '!!! pp = {} , [xp,yp,zp]={}'.format(pp,num_c)
     '''
 
+    '''
+    pp=0
+    p_prev=0
+    for p in range(0,len(num_c),scan_pieces):
+	for t in range(p_prev,p):
+	    pp=pp+num_c[t]
+
+	p_prev=p
+	[xp,yp,zp]=[clear_data[prev:prev+pp-1:1,0], clear_data[prev:prev+pp-1:1,1], clear_data[prev:prev+pp-1:1,2]]
+	#print 'pp = {} p_prev = {}'.format(pp, p_prev)
+	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
+	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
+	
+	cl_labels = cluster_labels[prev:prev+pp-1:1]
+	#print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+
+        max_cl = int(np.amax(cl_labels))
+	for k in range(1,max_cl+1) :
+	    filter=np.where(cl_labels==k)
+	    #print 'filter {} '.format(filter)
+	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
+	    #print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	    point_slots.append([xk,yk])
+	    #print 'point_slots {} '.format(point_slots)
+    
+	    #spline procedure
+	   
+	    print 'len(xk) = ',len(xk),' len(yk) = ',len(yk),' len(zk) = ',len(zk)
+	    kk=math.modf(math.sqrt(len(xk)) - 1)[1]
+	    if kk>=5:
+		kk=5
+	    if kk<=0:
+		continue
+	    print 'kk {}'.format(kk)
+	    f=interpolate.SmoothBivariateSpline(xk,yk,zk,kx=kk, ky=kk)
+    	    cof = f.get_coeffs()
+	    knots=f.get_knots()
+            print 'cof = {} knots={}'.format(cof,knots)
+	    ' 
+	    if len(xk)!=0 and len(yk)!=0 and len(zk)!=0:
+		
+	    	if len(xk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(xk))
+	    	if len(yk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(yk))
+	    	if len(zk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(zk))
+
+	    	#print 'centerk = {}'.format(centerk)
+	    	centerz_list.append(centerk)
+	    	centerk=[]
+
+	    	#get features of a cluster piece, where its points are extracted at each 'scan_pieces' scans
+	    	#extract_features(point_slots)
+	    	point_slots=[]
+	pp=0
+	prev=pp+prev
+	centertot_list.append(centerz_list)
+	centerz_list = []
+        '''
+    
     for p in range(0,len(num_c)):
 	pp=num_c[p]
 	[xp,yp,zp]=[clear_data[prev:prev+pp-1:1,0], clear_data[prev:prev+pp-1:1,1], clear_data[prev:prev+pp-1:1,2]]
@@ -645,8 +798,9 @@ def clustering2(clear_data, num_c):
 
 	    #points of every cluster at each timewindow
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
+
 	    #print '[xk,yk,zk] {}'.format([xk,yk,zk])
-	    '''
+	    
 	    for j in np.arange(0,z,z_scale):
 		flag_x=False
 		flag_y=False
@@ -682,7 +836,7 @@ def clustering2(clear_data, num_c):
 	    centerx = []
 	    centery=[]
 	    centerz=[]
-	    '''
+	    
 	    
             vcl.append(k)
             colors.append(ccnames[k%12])
@@ -694,12 +848,373 @@ def clustering2(clear_data, num_c):
     fig3.show()
     #print 'centerx = {} , centery={}'.format(centerx_list,centery_list)
 
-    #update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
+    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
   
+def rotation_matrix(angle, direction, point=None):
+    """Return matrix to rotate about axis defined by point and direction.
+
+    >>> R = rotation_matrix(math.pi/2, [0, 0, 1], [1, 0, 0])
+    >>> numpy.allclose(numpy.dot(R, [0, 0, 0, 1]), [1, -1, 0, 1])
+    True
+    >>> angle = (random.random() - 0.5) * (2*math.pi)
+    >>> direc = numpy.random.random(3) - 0.5
+    >>> point = numpy.random.random(3) - 0.5
+    >>> R0 = rotation_matrix(angle, direc, point)
+    >>> R1 = rotation_matrix(angle-2*math.pi, direc, point)
+    >>> is_same_transform(R0, R1)
+    True
+    >>> R0 = rotation_matrix(angle, direc, point)
+    >>> R1 = rotation_matrix(-angle, -direc, point)
+    >>> is_same_transform(R0, R1)
+    True
+    >>> I = numpy.identity(4, numpy.float64)
+    >>> numpy.allclose(I, rotation_matrix(math.pi*2, direc))
+    True
+    >>> numpy.allclose(2, numpy.trace(rotation_matrix(math.pi/2,
+    ...                                               direc, point)))
+    True
+
+    """
+    sina = math.sin(angle)
+    cosa = math.cos(angle)
+    direction = unit_vector(direction[:3])
+    
+    # rotation matrix around unit vector
+    R = np.diag([cosa, cosa, cosa])
+    R += np.outer(direction, direction) * (1.0 - cosa)
+    direction *= sina
+    R += np.array([[ 0.0,         -direction[2],  direction[1]],
+                      [ direction[2], 0.0,          -direction[0]],
+                      [-direction[1], direction[0],  0.0]])
+
+    return R
+    '''
+    M = np.identity(3)
+    M[:3, :3] = R
+    if point is not None:
+        # rotation not around origin
+        point = np.array(point[:3], dtype=np.float64, copy=False)
+        M[:3, 2] = point - np.dot(R, point)
+    return M
+    '''
+
+def unit_vector(data, axis=None, out=None):
+    """Return ndarray normalized by length, i.e. Euclidean norm, along axis.
+
+    >>> v0 = numpy.random.random(3)
+    >>> v1 = unit_vector(v0)
+    >>> numpy.allclose(v1, v0 / numpy.linalg.norm(v0))
+    True
+    >>> v0 = numpy.random.rand(5, 4, 3)
+    >>> v1 = unit_vector(v0, axis=-1)
+    >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
+    >>> numpy.allclose(v1, v2)
+    True
+    >>> v1 = unit_vector(v0, axis=1)
+    >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
+    >>> numpy.allclose(v1, v2)
+    True
+    >>> v1 = numpy.empty((5, 4, 3))
+    >>> unit_vector(v0, axis=1, out=v1)
+    >>> numpy.allclose(v1, v2)
+    True
+    >>> list(unit_vector([]))
+    []
+    >>> list(unit_vector([1]))
+    [1.0]
+
+    """
+    if out is None:
+        data = np.array(data, dtype=np.float64, copy=True)
+        if data.ndim == 1:
+            data /= math.sqrt(np.dot(data, data))
+            return data
+    else:
+        if out is not data:
+            out[:] = np.array(data, copy=False)
+        data = out
+    length = np.atleast_1d(np.sum(data*data, axis))
+    np.sqrt(length, length)
+    if axis is not None:
+        length = np.expand_dims(length, axis)
+    data /= length
+    if out is None:
+        return data
+
+def create_rotation_matrix(radians, direction):
+
+    R_matrix=[[0 for k in range(4)] for k in range(4)] 
+    R_matrix[3][3]=1
+    if direction==0:
+	R_matrix[0][0]=1
+	R_matrix[1][1]=math.cos(radians)
+	R_matrix[1][2]=-math.sin(radians)
+	R_matrix[2][1]=math.sin(radians)
+	R_matrix[2][2]=math.cos(radians)
+    elif direction==1:
+	R_matrix[1][1]=1
+	R_matrix[0][0]=math.cos(radians)
+	R_matrix[0][2]=math.sin(radians)
+	R_matrix[2][0]=-math.sin(radians)
+	R_matrix[2][2]=math.cos(radians)
+    elif direction==2:
+	R_matrix[2][2]=1
+	R_matrix[0][0]=math.cos(radians)
+	R_matrix[0][1]=-math.sin(radians)
+	R_matrix[1][0]=math.sin(radians)
+	R_matrix[1][1]=math.cos(radians)
+   
+    return R_matrix
+
+def translate_space(data, radians, direction):
+
+   
+   [x,y,z] = [data[:,0], data[:,1], data[:,2]]
+
+   R_matrix=create_rotation_matrix(radians, direction)
+
+   t_array=[]
+   T_matrix = [[0 for k in range(4)] for k in range(4)] 
+   T_matrix[0][0]=1
+   T_matrix[1][1]=1
+   T_matrix[2][2]=1
+   T_matrix[3][3]=1
+
+   #for every point in the array compute the translation matrix and multiply it with the rotation matrix, in order to produce the 'rotational' point.
+   for i in range(0, len(x)):
+	T_matrix[0][4]=-x[i]
+	T_matrix[1][4]=-y[i]
+	T_matrix[2][4]=-z[i]
+	
+	result = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*T_matrix)] for X_row in R_matrix]
+	print 'result {}'.format(result)
+	mx = np.matrix(T_matrix)
+	my = np.matrix(R_matrix)   
+	print 'mx * my = {}'.format(mx*my)
+	
+
+def clustering_procedure(clear_data, num_c):
+
+    global cc, ccnames, fig1, z, z_scale, center,fig3, curve, pol_degree
+    
+    #warnings.filterwarnings("ignore", category=DeprecationWarning)
+    hogs=[]
+    centerx=[]
+    centery=[]
+    centerz=[]
+    centerk=[]
+    centerx_list=[]
+    centery_list=[]
+    centerz_list=[]
+    centertot_list=[]
+    array_pieces=[]
+    point_slots=[]
+    features_array=[]
+    colors=[]
+    flag_x=False
+    flag_y=False
+    vcl=[] #Valid Cluster Labels 
+    valid_flag=0 #this flag is only set if we have at leat one valid cluster
+    Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
+    #print  len(clear_data),' points in ', np.amax(cluster_labels),'clusters'
+    #print 'Eps = ', Eps, ', outliers=' ,len(np.where(cluster_labels==-1))
+    max_label=int(np.amax(cluster_labels))
+
+
+
+    [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
+    #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
+    fig1.clear()
+    fig3.clear()
+    #print 'clear data {}'.format(clear_data)
+
+    #compute the projections of x,y axis by rotating z axis at specific angles
+    curve.clear()
+    feature_vector=[]
+
+    for k in range(1,max_label+1) :
+        filter=np.where(cluster_labels==k)
+        if len(filter[0])>40 :
+	    print 'cluster ',k
+	    #print 'xi[filter] {} \n yi[filter] {}\n zi[filter] {}'.format(xi[filter],yi[filter], zi[filter])
+	   
+            #ax.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k-1]) #this can be commented out
+            valid_flag=1
+            #print 'extracting surface for ',ccnames[k-1],' cluster '
+
+	    #points of every cluster at each timewindow
+	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
+	    trans_matrix =[[xk,yk,zk]]
+	    
+	    print 'trans_matrix {}'.format(trans_matrix)
+
+	    t1 = rotation_matrix(20,[0,0,1],[xk[0],yk[0],zk[0]])
+
+	    result_array1 = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*t1)] for X_row in trans_matrix]
+	    #print 'result_array1 = {}'.format(result_array1[0][0])
+	    #curve.scatter(result_array1[0][0],result_array1[0][1], c=cc[k%12])
+	    coef1 = np.polyfit(result_array1[0][0], result_array1[0][1], pol_degree)
+	    print 'coef1 = {}'.format(coef1)
+	    grad1=[]
+	    temp_degree=pol_degree
+	    for i in range(0,len(coef1)-1) :
+		feature_vector.append(coef1[i])
+		grad1.append(coef1[i]*temp_degree)
+		temp_degree=temp_degree-1
+		if temp_degree==0 :
+		    break
+
+	    t2 = rotation_matrix(60,[0,0,1],[xk[0],yk[0],zk[0]])
+
+	    result_array2 = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*t2)] for X_row in trans_matrix]
+	    #print 'result_arra2y = {}'.format(result_array2[0][0])
+	    #curve.scatter(result_array2[0][0],result_array2[0][1], c=cc[k%12])
+	    coef2 = np.polyfit(result_array2[0][0], result_array2[0][1], pol_degree)
+	    print 'coef2 = {}'.format(coef2)
+	    grad2=[]
+	    temp_degree=pol_degree
+	    for i in range(0,len(coef2)-1) :
+		feature_vector.append(coef2[i])
+		grad2.append(coef2[i]*temp_degree)
+		temp_degree=temp_degree-1
+		if temp_degree==0 :
+		    break
+
+	    xmin,xmax,ymin,ymax,xmean,ymean,standard_deviation=extract_main_features([xk,yk])
+	    feature_vector.append(xmin)
+	    feature_vector.append(xmax)
+	    feature_vector.append(ymin)
+	    feature_vector.append(ymax)
+	    feature_vector.append(standard_deviation)
+
+	    print 'features_array = {}'.format(features_array)
+	    features_array.append(feature_vector)
+	    feature_vector=[]
+
+	    vcl.append(k)
+            colors.append(ccnames[k%12])
+            grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+            grid=grid-np.amin(grid)
+            hogs.append(hog(grid))  #extract hog features
+
+    #get data points of each scan
+    prev=0
+    for p in range(0,len(num_c)):
+	pp=num_c[p]
+	[xp,yp,zp]=[clear_data[prev:prev+pp-1:1,0], clear_data[prev:prev+pp-1:1,1], clear_data[prev:prev+pp-1:1,2]]
+	#print 'pp = ',pp
+	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
+	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
+
+	#get clustering labels of these data points
+	cl_labels = cluster_labels[prev:prev+pp-1:1]
+	#print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+
+        max_cl = int(np.amax(cl_labels))
+	#for each cluster that is generated at every scan
+	for k in range(1,max_cl+1) :
+	    filter=np.where(cl_labels==k)
+	    #print 'filter {} '.format(filter)
+	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
+	    #print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	
+	    #point_slots.append([xk,yk])
+	    #print 'point_slots {} '.format(point_slots)
+	    
+	    if len(xk)==0 & len(yk==0) & len(zk)==0:
+		continue
+	    
+	    else:
+		if len(xk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(xk))
+	    	if len(yk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(yk))
+	    	if len(zk)==0:
+		    centerk.append(0)
+	    	else:
+	    	    centerk.append(np.mean(zk))
+	    #print 'centerk = {}'.format(centerk)
+	    centerz_list.append(centerk)
+	    centerk=[]
+
+	#extract_features(point_slots)
+	
+	prev=pp+prev
+
+	centertot_list.append(centerz_list)
+	
+	centerz_list = []
+
+    fig1.show()
+    fig3.show()
+
+
+    #print 'centertot list = {}'.format(centertot_list)
+    '''
+    cnt=0
+    totc=[]
+    for k in range(1,max_label+1) :
+	    for t in range(0,len(centertot_list)) :
+		try:
+		    centerx.append(centertot_list[t][cnt][0])
+		    centery.append(centertot_list[t][cnt][1])
+		    centerz.append(centertot_list[t][cnt][2])
+		except IndexError:
+		    break;
+	    cnt=cnt+1
+	    totc.append(centerx)
+	    totc.append(centery)
+	    totc.append(centerz)
+	    #print 'totc {}'.format(totc)
+    	    #print 'centerx = {} \n centery={} \n centerz={}'.format(centerx,centery,centerz)
+	    points = (len(centerx), 3)
+	    values = (centerx,centery,centerz)
+	    print 'size {} points {}    values {}'.format(len(centerx),points,values)
+	    tk=interpolate.NearestNDInterpolator(points,totc)
+	    print 'tk = {}'.format(tk)
+    '''
+    cnt=0
+    
+    for k in vcl :
+	    for t in range(0,len(centertot_list)) :
+		try:
+		    centerx.append(centertot_list[t][cnt][0])
+		    centery.append(centertot_list[t][cnt][1])
+		    centerz.append(centertot_list[t][cnt][2])
+		except IndexError:
+		    break;
+	    cnt=cnt+1
+
+	    print 'cluster=',k
+	    trans_matrix =[[np.array(centerx), np.array(centery), np.array(centerz)]]
+	    print '-----------------------------------------------------'
+	    #translate_space(trans_matrix[0], 30, 2)
+	    #print 'trans_matrix {}'.format(trans_matrix)
+	    t3 = rotation_matrix(30,[0,0,1],[centerx,centery,centerz])
+	    #print 't3 = {}'.format(t3)
+	    result_array3 = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*t3)] for X_row in trans_matrix]
+	    #print 'result_array3 = {}'.format(result_array3)
+	    curve.scatter(result_array3[0][0], result_array3[0][1], c=cc[k%12])
+	    coef3 = np.polyfit(result_array3[0][0], result_array3[0][1], pol_degree)
+	    print 'coef3 = {}'.format(coef3)
+	    '''
+	    points = np.array((centerx, centery)).T
+	    values=np.array(centerz).T
+	    f1=interpolate.LinearNDInterpolator(points,values)
+	    print 'f1={}'.format(f1)
+	    '''
+    
+
+    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
+
 
 def clustering(clear_data, num_c):
 
-    global cc, ccnames, fig1, z, z_scale, center,fig3
+    global cc, ccnames, fig1, z, z_scale, center,fig3, curve
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -724,7 +1239,7 @@ def clustering(clear_data, num_c):
     for s in range(0,len(num_c)):
 	ss=ss+num_c[s]
     print 'num point {} num_c {}'.format(len(clear_data),ss)
-    print 'cluster_labels={} max_label={}'.format(cluster_labels,max_label)
+    #print 'cluster_labels={} max_label={}'.format(cluster_labels,max_label)
 
     [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
     #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
@@ -742,19 +1257,20 @@ def clustering(clear_data, num_c):
 	#print 'pp = {} , [xp,yp,zp]={}'.format(pp,[xp,yp,zp])
 	#print 'clear_data[prev:p:1,0] {}'.format(clear_data[prev:p:1,0])
 	cl_labels = cluster_labels[prev:prev+pp:1]
-	print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
+	#print 'cl_labels {} max {}'.format(cl_labels, int(np.amax(cl_labels)))
 	for k in range(1,int(np.amax(cl_labels))) :
 	    filter=np.where(cl_labels==k)
 	    [xk,yk,zk]=[xp[filter],yp[filter],zp[filter]]
-	    print '[xk,yk,zk]={}'.format([xk,yk,zk])
+	    #print '[xk,yk,zk]={}'.format([xk,yk,zk])
 	
 	prev=pp
 
 
-
+    curve.clear()
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
+	    print 'cluster ',k
 	    #print 'xi[filter] {} \n yi[filter] {}\n zi[filter] {}'.format(xi[filter],yi[filter], zi[filter])
 	   
             #ax.scatter(xi[filter],yi[filter], zi[filter], 'z', 30, cc[k-1]) #this can be commented out
@@ -763,7 +1279,32 @@ def clustering(clear_data, num_c):
 
 	    #points of every cluster at each timewindow
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
-	    #print '[xk,yk,zk] {}'.format([xk,yk,zk])
+	    trans_matrix =[[xk,yk,zk]]
+	    
+	    print '[xk,yk,zk] {}'.format([xk,yk,zk])
+	    '''
+	    for i in range(0,len(xk)) :
+		t = rotation_matrix(10,[0,0,1],[xk[i],yk[i],zk[i]])
+		print 't = {}'.format(t)
+	    	trans_matrix.append(t)
+	    '''
+	    t1 = rotation_matrix(10,[0,0,1],[xk[0],yk[0],zk[0]])
+
+	    result_array1 = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*t1)] for X_row in trans_matrix]
+	    #print 'result_array1 = {}'.format(result_array1[0][0])
+	    curve.scatter(result_array1[0][0],result_array1[0][1],s=20, c=cc[k%12])
+	    coef1 = np.polyfit(result_array1[0][0], result_array1[0][1], 3)
+	    print 'coef1 = {}'.format(coef1)
+
+
+	    t2 = rotation_matrix(60,[0,0,1],[xk[0],yk[0],zk[0]])
+
+	    result_array2 = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*t2)] for X_row in trans_matrix]
+	    #print 'result_arra2y = {}'.format(result_array2[0][0])
+	    curve.scatter(result_array2[0][0],result_array2[0][1],s=20, c=cc[k%12])
+	    coef2 = np.polyfit(result_array2[0][0], result_array2[0][1], 3)
+	    print 'coef2 = {}'.format(coef2)
+	
 	    for j in np.arange(0,z,z_scale):
 		flag_x=False
 		flag_y=False
@@ -791,7 +1332,7 @@ def clustering(clear_data, num_c):
 		except IndexError:
 		    break
 
-	    print 'centerx = {} , centery={} , centerz={}'.format(centerx,centery,centerz)
+	    #print 'centerx = {} , centery={} , centerz={}'.format(centerx,centery,centerz)
 	    #centerx_list contains the lists of centroids of each cluster at each timeslot
 	    centerx_list.append(centerx)
 	    centery_list.append(centery)
@@ -806,11 +1347,12 @@ def clustering(clear_data, num_c):
             grid=grid-np.amin(grid)
             hogs.append(hog(grid))  #extract hog features
 
+    
     fig1.show()
     fig3.show()
     #print 'centerx = {} , centery={}'.format(centerx_list,centery_list)
 
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list,centerz_list)
+    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list,centerz_list)
   
 
 
@@ -901,7 +1443,9 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list
 
 	#center.clear()
     	#center.plot(wall_cart[:,0],wall_cart[:,1])
-        print 'centerx_list = {} , centery_list={} , centerz_list={}'.format(centerx_list,centery_list,centerz_list)
+        #print 'centerx_list = {} , centery_list={} , centerz_list={}'.format(centerx_list,centery_list,centerz_list)
+
+	
 
         if np.array(hogs).shape==(1,36):
             #BEFORE
@@ -1038,6 +1582,7 @@ def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
 	#center.clear()
     	#center.plot(wall_cart[:,0],wall_cart[:,1])
         
+
         if np.array(hogs).shape==(1,36):
             #BEFORE
             temp = zscore(np.array(hogs)[0])
@@ -1121,9 +1666,11 @@ def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
 		except IndexError:
 		    break;
 		
-	    print 'centerx {} , centery{} , centerz {}'.format(centerx, centery, centerz)
+	    #print 'centerx {} , centery{} , centerz {}'.format(centerx, centery, centerz)
 	    center.scatter(centerx,centery,centerz, 'z', 30, c=cc[k%12])
 	    fig3.add_axes(center)
+
+	    
 
 	    #fig1.add_axes(pca_plot)
 	    #add to a struct the classification prediction and the point cloud of the respective cluster
