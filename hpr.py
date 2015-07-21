@@ -201,7 +201,7 @@ def laser_listener():
 
 def online_test(laser_data):
     global wall_flag, wall, fr_index, intens, w_index, phi, sampling, limit #prosthesa to limit edw giati den to epairne global
-    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax,fig1,fig3, kat, center,curve
+    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax, ax3 ,fig1,fig3,fig4, kat, center,curve
     global pca_obj, pca_plot
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges, total_cluster_time
     global mybuffer2, num_c
@@ -243,7 +243,7 @@ def online_test(laser_data):
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag = 1
-            center,kat,curve,ax=initialize_plots(wall_cart)
+            ax3,center,kat,curve,ax=initialize_plots(wall_cart)
 
             angle_increment=laser_data.angle_increment
             scan_time=laser_data.scan_time
@@ -339,7 +339,7 @@ def loadfiles():
     return classifier, pca_obj
 
 def initialize_plots(wall_cart):
-    global fig1,fig3
+    global fig1,fig3,fig4
 
     fig3=plt.figure()
     plot2d1= fig3.gca(projection='3d')
@@ -365,8 +365,15 @@ def initialize_plots(wall_cart):
     plot3d.set_ylabel('Y - Robot')
     plot3d.set_zlabel('Z - time')
 
+    fig4=plt.figure()
+    plot_pca= fig4.gca(projection='3d')
+    plot_pca.set_xlabel('X - Distance')
+    plot_pca.set_ylabel('Y - Robot')
+    plot_pca.set_zlabel('Z - time')
+
+
     plt.show()
-    return plot2d1,plot2d,plot2d2,plot3d
+    return plot_pca,plot2d1,plot2d,plot2d2,plot3d
 
 
 def extract_main_features(point_cloud):
@@ -475,7 +482,7 @@ def extract_features(array_pieces):
 def cluster_into_pieces(clear_data, num_c):
 
 
-    global cc, ccnames, fig1, z, z_scale, center,fig3, kat, wall_cart
+    global cc, ccnames, fig1, fig4, z, z_scale, center,fig3, kat, wall_cart
     global scan_pieces, curve
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -563,6 +570,7 @@ def cluster_into_pieces(clear_data, num_c):
     #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
     fig1.clear()
     fig3.clear()
+    fig4.clear()
     #print 'into clustering: [xi,yi,zi] = {}'.format([xi,yi,zi])
     
     #print '[xk,yk] {} '.format([xk,yk])
@@ -848,7 +856,7 @@ def clustering2(clear_data, num_c):
     fig3.show()
     #print 'centerx = {} , centery={}'.format(centerx_list,centery_list)
 
-    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
+    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list,[])
   
 def rotation_matrix(angle, direction, point=None):
     """Return matrix to rotate about axis defined by point and direction.
@@ -985,17 +993,35 @@ def translate_space(data, radians, direction):
 	T_matrix[0][4]=-x[i]
 	T_matrix[1][4]=-y[i]
 	T_matrix[2][4]=-z[i]
+
 	
+	
+	'''
 	result = [[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*T_matrix)] for X_row in R_matrix]
 	print 'result {}'.format(result)
 	mx = np.matrix(T_matrix)
 	my = np.matrix(R_matrix)   
 	print 'mx * my = {}'.format(mx*my)
+	'''
 	
+
+def translate_cluster(x, y, z, xmean, ymean, zmean) :
+
+    new_x=[]
+    new_y=[]
+    new_z=[]
+
+    for i in range(0, len(x)):
+	new_x.append(abs(x-xmean))
+	new_y.append(abs(y-ymean))
+	new_z.append(abs(z-zmean))
+
+    return [new_x,new_y,new_z]
+
 
 def clustering_procedure(clear_data, num_c):
 
-    global cc, ccnames, fig1, z, z_scale, center,fig3, curve, pol_degree
+    global cc, ccnames, fig1, z, z_scale, center,ax3,fig3, fig4, curve, pol_degree
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -1026,11 +1052,13 @@ def clustering_procedure(clear_data, num_c):
     #print '[xi,yi,zi] = {} \n'.format([xi,yi,zi])
     fig1.clear()
     fig3.clear()
+    fig4.clear()
     #print 'clear data {}'.format(clear_data)
 
     #compute the projections of x,y axis by rotating z axis at specific angles
     curve.clear()
     feature_vector=[]
+    pca_cl=[]
 
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
@@ -1045,8 +1073,18 @@ def clustering_procedure(clear_data, num_c):
 	    #points of every cluster at each timewindow
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
 	    trans_matrix =[[xk,yk,zk]]
+
+	    mypca=PCA()
+	    mypca.n_components = 3
+	    rotation = mypca.fit_transform([xk,yk,zk])
+
+	    [xnew,ynew,znew]=translate_cluster(xk,yk,zk, np.mean(xk), np.mean(yk), np.mean(zk))
+
+	    pca_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*[xnew,ynew,znew])] for X_row in rotation]
+	    pca_cl.append(pca_result)
+	    print ' pca_res {}'.format(pca_result)
+
 	    
-	    print 'trans_matrix {}'.format(trans_matrix)
 
 	    t1 = rotation_matrix(20,[0,0,1],[xk[0],yk[0],zk[0]])
 
@@ -1054,7 +1092,7 @@ def clustering_procedure(clear_data, num_c):
 	    #print 'result_array1 = {}'.format(result_array1[0][0])
 	    #curve.scatter(result_array1[0][0],result_array1[0][1], c=cc[k%12])
 	    coef1 = np.polyfit(result_array1[0][0], result_array1[0][1], pol_degree)
-	    print 'coef1 = {}'.format(coef1)
+	    #print 'coef1 = {}'.format(coef1)
 	    grad1=[]
 	    temp_degree=pol_degree
 	    for i in range(0,len(coef1)-1) :
@@ -1070,7 +1108,7 @@ def clustering_procedure(clear_data, num_c):
 	    #print 'result_arra2y = {}'.format(result_array2[0][0])
 	    #curve.scatter(result_array2[0][0],result_array2[0][1], c=cc[k%12])
 	    coef2 = np.polyfit(result_array2[0][0], result_array2[0][1], pol_degree)
-	    print 'coef2 = {}'.format(coef2)
+	    #print 'coef2 = {}'.format(coef2)
 	    grad2=[]
 	    temp_degree=pol_degree
 	    for i in range(0,len(coef2)-1) :
@@ -1094,7 +1132,9 @@ def clustering_procedure(clear_data, num_c):
 	    vcl.append(k)
             colors.append(ccnames[k%12])
             grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
+	    #print 'grid1 {}'.format(grid)
             grid=grid-np.amin(grid)
+	    #print 'grid2 {}'.format(grid)
             hogs.append(hog(grid))  #extract hog features
 
     #get data points of each scan
@@ -1151,6 +1191,7 @@ def clustering_procedure(clear_data, num_c):
 
     fig1.show()
     fig3.show()
+    fig4.show()
 
 
     #print 'centertot list = {}'.format(centertot_list)
@@ -1209,7 +1250,7 @@ def clustering_procedure(clear_data, num_c):
 	    '''
     
 
-    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list)
+    update_plots2(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list, pca_cl)
 
 
 def clustering(clear_data, num_c):
@@ -1516,11 +1557,13 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, cc[col%12]) #human
                 fig1.add_axes(ax)
+
             else:
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, cc[col%12]) #object
                 fig1.add_axes(ax)
+		
 
 	    center.scatter(centerx_list[cnt],centery_list[cnt],centerz_list[cnt], 'z', 30, c=cc[k%12])
 	    fig3.add_axes(center)
@@ -1561,9 +1604,9 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl,centerx_list,centery_list
         #sio.savemat('classification_results',b);
 
 
-def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
+def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list, pca_cl):
     
-    global kat, fig1, ax, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, pca_plot, center, fig3
+    global kat, fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, pca_plot, center, fig3, fig4
     global annotations, first_time, flag_hogs
 
     temp = []
@@ -1573,6 +1616,13 @@ def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
     centerz = []
     #temp2 = np.empty(36)           #Currently removed this way of calculating the zscore with temp2 because an update of python made it unusable
     
+
+    #Create PCA object
+    #pca = PCA()
+    #pca.fit(temp)
+    #temp = pca.transform(temp)
+
+
     #ZSCORE UPDATE
     #zscore the entire hogs table, not single cluster hogs
     if flag==1:
@@ -1646,17 +1696,25 @@ def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
             filter=np.where(cluster_labels==k)
             
             [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
+	    [xc,yc,zc] = [pca_cl[cnt][0], pca_cl[cnt][1], pca_cl[cnt][2]]
+	    print 'lex xc {} len yc {} len zc {}'.format(len(xc),len(yc),len(zc))
 
             if results[cnt]==1:
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #human
                 fig1.add_axes(ax)
+
+		ax3.scatter(xc,yc, zc, 'z', 30, cc[col%12]) #human
+                fig4.add_axes(ax3)
             else:
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #object
                 fig1.add_axes(ax)
+
+		ax3.scatter(xc,yc, zc, 'z', 30, cc[col%12]) #human
+                fig4.add_axes(ax3)
 	    
 	    for t in range(0,len(centertot_list)) :
 		try:
@@ -1667,8 +1725,8 @@ def update_plots2(flag,hogs,xi,yi,zi,cluster_labels,vcl,centertot_list):
 		    break;
 		
 	    #print 'centerx {} , centery{} , centerz {}'.format(centerx, centery, centerz)
-	    center.scatter(centerx,centery,centerz, 'z', 30, c=cc[k%12])
-	    fig3.add_axes(center)
+	    #center.scatter(centerx,centery,centerz, 'z', 30, c=cc[k%12])
+	    #fig3.add_axes(center)
 
 	    
 

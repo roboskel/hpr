@@ -114,7 +114,10 @@ def offline_train():
     
     global fr_index , ind ,all_hogs, all_surf,fig1,ax,kat,wall_cart,wall,kat,mat_file
     global z, z_scale, slot_count, human_l ,cluster_l,slot_touched,all_scans
-    global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename, wall_end, range_limit
+    global timewindow ,slot_data , phi,wall_index,annotations,em_index, filename, wall_end, range_limit, point_clouds
+
+    point_clouds=[]
+
 
     if (len(sys.argv)==4):
         #FULL ARGUMENTS GIVEN
@@ -192,6 +195,9 @@ def offline_train():
     
     mybuffer=all_data[0]
 
+    #read_clouds()
+    #exit()
+
     #limit=((max_index-wall_end-120)/timewindow) #epitrepo 3 s kena
     limit=(max_index-wall_end-(3*int(timewindow)))/int(timewindow) #allocate at least 3 tw to detect wall
     print "{0} slots will be processed, after walls are removed".format(limit)
@@ -262,7 +268,7 @@ def offline_train():
                 mybuffer=mybuffer[np.where(mybuffer[:,0] > 0.2),:][0]
                 
                 print 'empty scans: {0}'.format(em_index)
-                cluster_labels,human,hogs,ann,surfaces=cluster_train(mybuffer) #clustering
+                cluster_labels,human,hogs,ann,surfaces,cluster_points = cluster_train(mybuffer) #clustering
 
                 if len(hogs)!=0:
                     print'len(hogs)!=0'
@@ -278,11 +284,13 @@ def offline_train():
                             cluster_l=cluster_labels
                             all_surf=surfaces
                             all_hogs=hogs
+			    #point_clouds.append(cluster_points)
                             annotations=ann
 
                     else:
                             all_surf=np.vstack((all_surf,surfaces))
                             all_hogs=np.vstack((all_hogs,hogs))
+			    #point_clouds.append(cluster_points)
                             slot_data=np.hstack((slot_data,ha))
                             all_scans=np.vstack((all_scans,mybuffer) )
                             cluster_l=np.hstack((cluster_l,cluster_labels))
@@ -296,10 +304,31 @@ def offline_train():
                     if slot_count>limit:
                         print 'EXITING'
                         exit()
-                        
+        
+    #print 'all hogs {} point clouds {}'.format(all_hogs, point_clouds)         
     build_classifier(np.array(all_hogs),np.array(annotations))
+    save_clouds(np.array(annotations), point_clouds)
     save_data()
     #exit()
+
+
+def read_clouds():
+
+    mat_content=sio.loadmat(filename[:-4]+'_labels')
+
+    return mat_content['point_clouds'], mat_content['annotation'][0]
+
+
+
+
+def save_clouds(annotations, point_clouds):
+
+    b={}
+    b['annotations']=annotations
+    b['point_clouds']=point_clouds
+
+    sio.savemat(filename[:-4]+'_labels',b);
+    
 
 
 def pol2cart(r,theta,zed):
@@ -334,16 +363,72 @@ def initialize_plots(wall_cart):
     
     return plot2d,plot3d
 
+
+def euclidean_distance(v1, v2):
+    '''
+    list_dist = []
+
+    min_dist = -1.0
+    index=0
+
+    
+    if isinstance(v1, list):
+        for i in range(0,len(v1)):
+	    distance = dist.euclidean(np.array(v1)[i],v2)
+	        #print distance
+	    if min_dist == -1.0:
+		min_dist=distance
+		index=j
+	    elif distance <= min_dist:
+		min_dist=distance
+		index=j
+
+	 list_dist.append(index)
+	 index=0
+	 min_dist=-1.0
+    
+    if not isinstance(v1, list):
+	#print 'v1 has a single hog array'
+	for j in range(0,len(v2)):
+	    distance = dist.euclidean(v1,np.array(v2)[j])
+	    #print distance
+	    if min_dist == -1.0:
+		min_dist=distance
+		index=j
+	    elif distance <= min_dist:
+		min_dist=distance
+		index=j
+
+	list_dist.append(index)
+    if flag==True:
+	#print 'v2 has a single hog array'
+	for j in range(0,len(v1)):
+	    distance = dist.euclidean(np.array(v1)[j],v2)
+	    #print distance
+	    if min_dist == -1.0:
+		min_dist=distance
+		index=j
+	    elif distance <= min_dist:
+		min_dist=distance
+		index=j
+
+	list_dist.append(index)
+    
+    return list_dist
+    '''
+
+
 def cluster_train(clear_data):
 
-    global cc, ccnames, kat, ax, fig1, wall_cart, fig3
-    global annotated_humans, annotated_obstacles
+    global cc, ccnames, kat, ax, fig1, wall_cart, fig3, hogs_temp
+    global annotated_humans, annotated_obstacles, cc, point_clouds
     hogs=[]
     surfaces=[]
     ann=[]
+    cluster_points=[]
 
     Eps, cluster_labels= dbscan(clear_data,3) # DB SCAN
-    print  len(clear_data),' points in ', np.amax(cluster_labels),'clusters'
+    print  'eps = ',Eps,' , ',len(clear_data),' points in ', np.amax(cluster_labels),'clusters'
     #print 'Eps = ', Eps, ', outliers=' ,len(np.where(cluster_labels==-1))
     max_label=int(np.amax(cluster_labels))
     human=np.zeros(len(clear_data))
@@ -360,6 +445,9 @@ def cluster_train(clear_data):
             fig1.add_axes(ax)
             #kat.scatter(xi[filter],yi[filter],s=20, c=cc[k-1])
             kat.scatter(xi[filter],yi[filter],s=20, c=cc[k%12]) 
+
+	    [xk,yk,zk] = [xi[filter],yi[filter], zi[filter]]
+	    point_clouds.append([xk,yk,zk])
             
             grid=gridfit(yi[filter], zi[filter], xi[filter], 16, 16) #extract surface
             grid=grid-np.amin(grid) #build surface grid
@@ -370,6 +458,8 @@ def cluster_train(clear_data):
                     linewidth=0, antialiased=False)
             surfaces.append(grid)
             hogs.append(hog(grid)) #extract features
+
+	    #list_dist=euclidean_distance(hogs_temp, hog(grid))
             
             plt.pause(0.0001)
             
@@ -395,7 +485,8 @@ def cluster_train(clear_data):
             human[filter]=ha
             ann.append(ha)
 
-    return cluster_labels,human,hogs,ann,surfaces
+    hogs_temp = np.array(np.array(hogs))
+    return cluster_labels,human,hogs,ann,surfaces,cluster_points
 
 
 def build_classifier(traindata, annotations):
