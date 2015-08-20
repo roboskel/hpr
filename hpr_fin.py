@@ -40,8 +40,9 @@ pca_obj = PCA()
 annotation_file = ''
 first_time = True
 first_time_ranges = True
+f_time=True
 sub_topic = 'scan'
-metrics = 0
+#metrics=0
 total_cluster_time = 0
 hogs_temp=[]
 
@@ -105,12 +106,14 @@ def laser_listener():
     global gaussian, pca_obj
     global timewindow, range_limit, annotated_data, classification_array
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
+    global tot_results, metrics
     
     all_clusters=[]
     all_hogs=[]
     all_gridfit=[]
     all_orthogonal=[]
     all_annotations=[]
+    tot_results=[]
 
     if not len(sys.argv) == 7:
         print "###################################"
@@ -170,7 +173,8 @@ def laser_listener():
                 break
             else:
                 print 'Try again'
-   
+
+    print "metrics: ",metrics
     print "Classifier object path : ", class_path 
     print "PCA object path : ", pca_path
     print "Scan Topic : ", sub_topic
@@ -178,7 +182,8 @@ def laser_listener():
     print "Maximum scan range (meters)", range_limit
     print "Waiting for laser scans ..."
     #ADDITIONS command line inputs klp
-    
+   
+ 
     rospy.Subscriber(sub_topic,LaserScan,online_test)
     scan_received=rospy.Time.now().to_sec()
     gaussian, pca_obj = loadfiles()
@@ -195,9 +200,9 @@ def laser_listener():
         b['angle_max']=angle_max
         b['intensities']=intensities
         b['wall']=wall
-        print b['wall']
-        b['annotations']=annotations
-        b['ranges']=ranges_
+        #print b['wall']
+        #b['annotations']=annotations
+        #b['ranges']=ranges_
         try:
             os.remove('classification_results.mat')
         except OSError:
@@ -205,6 +210,9 @@ def laser_listener():
         sio.savemat('classification_results',b);
 
     print 'duration in milliseconds = {0}'.format(total_cluster_time)
+
+    if metrics == 1:
+    	get_accuracy(all_annotations,tot_results)
     #save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
     print "D O N E !"
     #Calculate_Metrics(annotated_data)
@@ -218,7 +226,7 @@ def online_test(laser_data):
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges, total_cluster_time
     global mybuffer2, num_c
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
-
+    global tot_results, metrics
 
 
     millis_start = int(round(time.time() * 1000))
@@ -252,7 +260,7 @@ def online_test(laser_data):
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag = 1
-            ax,ax3=initialize_plots(wall_cart)
+            kat,ax,ax3=initialize_plots(wall_cart)
 
             angle_increment=laser_data.angle_increment
             scan_time=laser_data.scan_time
@@ -331,6 +339,9 @@ def loadfiles():
     classifier = pickle.load( open( class_path, "rb" ) )
     pca_obj = pickle.load(open ( pca_path, "rb"))
     #all_annotations = pickle.load(open("cluster_labels/video5annotations.p","rb"))
+    mat=sio.loadmat("cluster_labels/video5_labels.mat")
+    #all_annotations=mat['annotations'][0]
+    #print 'AN = ',len(all_annotations)
     
     return classifier, pca_obj
 
@@ -339,13 +350,13 @@ def initialize_plots(wall_cart):
     global fig1,fig4
 
     #2D projection of the cluster
-    '''
+    
     temp=plt.figure()
     plot2d = temp.add_subplot(111)
     plot2d.set_xlabel('Vertical distance')
     plot2d.set_ylabel('Robot is here')
     plot2d.plot(wall_cart[:,0],wall_cart[:,1])
-    '''
+    
 
 
     #3D clusters
@@ -364,7 +375,7 @@ def initialize_plots(wall_cart):
 
 
     plt.show()
-    return plot3d,plot_align
+    return plot2d,plot3d,plot_align
 
 def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
 
@@ -375,7 +386,7 @@ def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
     b['hogs']=hogs
     b['annotations']=annotations
 
-    sio.savemat('data',b);
+    sio.savemat('new_data/video1_data.mat',b);
     
 
 def translate_cluster(x, y, z) :
@@ -397,11 +408,30 @@ def translate_cluster(x, y, z) :
     return [new_x,new_y,new_z]
 
 
+def multiply_array(x,y,z, V) :
+
+    new_x=[]
+    new_y=[]
+    new_z=[]
+    
+
+    for i in range(0, len(x)):
+	#for j in range(0,len(V)):
+	new_x.append(x[i]*V[0][0] + y[i]*V[0][1] + z[i]*V[0][2])
+	new_y.append(x[i]*V[1][0] + y[i]*V[1][1] + z[i]*V[1][2])
+	new_z.append(x[i]*V[2][0] + y[i]*V[2][1] + z[i]*V[2][2])
+
+    return [new_x,new_y,new_z]
+
+
+
+
 
 def clustering_procedure(clear_data, num_c):
 
     global cc, ccnames, fig1, z, z_scale, fig4
     global all_clusters,all_hogs,all_gridfit,all_orthogonal
+    global tot_results, all_annotations, metrics
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -422,7 +452,7 @@ def clustering_procedure(clear_data, num_c):
     fig4.clear()
     
 
-    #for every created cluster get its data points
+    #for every created cluster - its data points
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
@@ -438,12 +468,14 @@ def clustering_procedure(clear_data, num_c):
 
 	    #we get U by appying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimention.
 	    U,s,V=np.linalg.svd(np.cov([xk,yk,zk]), full_matrices=False)
+	    #print 'U = {} s = {} V={}'.format(U,s,V)
 
 	    #translate each cluster to the begining of the axis and then do the rotation
 	    [xnew,ynew,znew]=translate_cluster(xk,yk,zk)
 
 	    #(traslation matrix) x (rotation matrix) = alignemt of cluster
-	    alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for Y_col in zip(*[xnew,ynew,znew])] for X_row in U]
+	    #alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
+	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	    
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
@@ -457,8 +489,9 @@ def clustering_procedure(clear_data, num_c):
             grid=grid-np.amin(grid)
 
 	    features=hog(grid)
-	    all_hogs.append(features)
-            hogs.append(features)  #extract hog features
+	    f=hog(grid, orientations=6, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualise=False)
+	    all_hogs.append(f)
+            hogs.append(f)  #extract hog features
 
 
     
@@ -467,6 +500,26 @@ def clustering_procedure(clear_data, num_c):
 
 
     update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl)
+
+
+
+def get_accuracy(ann, results):
+
+    acc=0.0
+    T=0.0
+    F=0.0
+
+    if len(ann) != len(results):
+	print 'ERROR'
+
+    for i in range(0, len(ann)):
+	if ann[i]==results[i]:
+	    T=T+1
+	else:
+	    F=F+1
+
+    acc=100*T/(T+F)
+    print 'acc = {}'.format(acc)
 
 
 
@@ -502,8 +555,9 @@ def speed(num_c,xnea,ynew,znew):
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
     
-    global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4
+    global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4,kat
     global annotations, first_time, all_annotations,annotated_humans,annotated_obstacles
+    global tot_results, metrics, f_time
 
     temp = []
     store_results = []
@@ -511,28 +565,33 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
     centery = []
     centerz = []
 
+
+
     #zscore the entire hogs table, not single cluster hogs
     if flag==1:
-        #kat.clear()
-        #kat.plot(wall_cart[:,0],wall_cart[:,1])
+        kat.clear()
+        kat.plot(wall_cart[:,0],wall_cart[:,1])
 
         if np.array(hogs).shape==(1,36):
             temp = zscore(np.array(hogs)[0])
+            #temp = np.array(hogs)[0]
 
         else:
             for i in range(0,len(hogs)):
                 temp.append(zscore(np.array(hogs[i])))
+                #temp.append(np.array(hogs[i]))
         
-        
-	temp_pca = pca_obj.transform(temp)
-        results = gaussian.predict(temp_pca)
+
+	#temp_pca = pca_obj.transform(temp)
+        #results = gaussian.predict(temp_pca)
+	results = gaussian.predict(temp)
         print results
 
         cnt=0
 	col_list=[]
 
         for k in vcl:
-	    fig1.clear()
+	    #fig1.clear()
             filter=np.where(cluster_labels==k)
             
             [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
@@ -548,39 +607,45 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
 
             if results[cnt]==1:
                 #classification_array.append(1)
-                #kat.scatter(x,y,s=20, c='r')
+                kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #human
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
+		#ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
                 #fig4.add_axes(ax3)
             else:
                 #classification_array.append(0)
-                #kat.scatter(x,y,s=20, c='b')
+                kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #object
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
+		#ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
                 fig1.add_axes(ax)
 
-		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
+		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
                 #fig4.add_axes(ax3)
 	    
 	    cnt=cnt+1
-	    fig1.show()
+	    #fig1.show()
+            plt.pause(0.0001)
 
-	    '''
-	    ha = raw_input()
-            if (int(ha)==1 or int(ha)==0):
-                ha = int(ha)
-                if ha == 1:
-                    annotated_humans = annotated_humans + 1
-                else :
-                    annotated_obstacles = annotated_obstacles + 1
+	    if metrics == 1 :
+	    	ha = raw_input()
+            	if (int(ha)==1 or int(ha)==0):
+                	ha = int(ha)
+                	
 
-		all_annotations.append(ha)
-	    '''
+			#all_annotations.append(ha)
+	    
+			if first_time:
+                		all_annotations = np.array(ha)
+				tot_results = np.array(results)
+                		first_time = False
+            		else:
+                		all_annotations=np.hstack((all_annotations,np.array(ha)))
+				
 
-        plt.pause(0.0001)
+	   
+
 
 	pickle.dump(store_results, open('stored_predictions.p','a'))
 	file_name=open('stored_predictions.txt','a')
@@ -589,12 +654,21 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
 	file_name.close()
 
         if metrics == 1:
+            if f_time:
+                tot_results = np.array(results)
+                f_time = False
+            else:
+		tot_results=np.hstack((tot_results,np.array(results)))	
+
+	'''
+        if metrics == 1:
             if first_time:
                 annotations = np.array(results)
                 first_time = False
             else:
                 annotations=np.hstack((annotations,np.array(results)))
-
+	'''
+	
 
 	hogs_temp = np.array(np.array(temp))
         
