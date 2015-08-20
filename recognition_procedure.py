@@ -83,7 +83,7 @@ def loadfiles(path):
 
 def train():
 
-    global annotations, features, points
+    global annotations, features, points,path
 
     features=[]
     annotations=[]
@@ -94,7 +94,7 @@ def train():
     print "##########################################################"
     print "Run with no arguments to train with data located in current folder"
     print "To specifiy the location of the training data run as follows :"
-    print ">python merge_train.py <path of folder of training data> <percentage of training set - 0.7 recommended>"
+    print ">python recognition_procedure.py <path of folder of training data> <percentage of training set - 0.7 recommended>"
     print "##########################################################"
     if (len(sys.argv)==3):
         path = sys.argv[1]
@@ -217,7 +217,7 @@ def create_sets(pos):
 
 def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
 
-    global all_grids
+    global all_grids, path
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -234,6 +234,10 @@ def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
     gaussian_nb.fit(normalized_train, train_ann)
 
 
+    #store the classifier and the pca object
+    pickle.dump( gaussian_nb, open(path+"GaussianNB_classifier.p", "wb+" ) )
+    pickle.dump( pca, open(path+"PCA_object.p", "wb+"))
+
     #convert test data to suitable format and test the NB classifier
     normalized_test = zscore(test_set)
     test = pca.transform(test_set)
@@ -246,6 +250,8 @@ def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
 
 
 def SVMclassification(train_set,test_set,train_ann,test_ann):
+  
+    global path
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -255,6 +261,9 @@ def SVMclassification(train_set,test_set,train_ann,test_ann):
     classifier = svm.SVC(kernel='rbf', gamma=0.5, C=1.0, tol=2.0)
     results = classifier.fit(train_set, train_ann).predict(test_set)
  
+    #store the trained classifier
+    pickle.dump( classifier, open(path+"SVM_classifier.p", "wb+" ) )
+
     cm = confusion_matrix(test_ann, results)
 
     print 'CONFUSION MATRIX = {}'.format(cm)
@@ -263,6 +272,7 @@ def SVMclassification(train_set,test_set,train_ann,test_ann):
 
 def LDAclassification(train_set,test_set,train_ann,test_ann):
 
+    global path
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -271,9 +281,15 @@ def LDAclassification(train_set,test_set,train_ann,test_ann):
 
     #train the LDA classifier
     classifier.fit(train_set, train_ann)
+
+    #store the trained classifier
+    pickle.dump( classifier, open(path+"LDA_classifier.p", "wb+" ) )
         
     results = classifier.predict(test_set)
  
+    #res2 = classifier.predict()
+
+
     cm = confusion_matrix(test_ann, results)
 
     print 'CONFUSION MATRIX = {}'.format(cm)
