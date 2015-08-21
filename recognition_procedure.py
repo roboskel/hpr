@@ -114,11 +114,11 @@ def train():
 	features = feature_extraction(points)
     	train_set,test_set,train_ann,test_ann = create_sets(train_perc, features, annotations)
 
-	print 'PCA + NB'
+	print 'PCA + NB:'
     	NB_PCAclassification(train_set,test_set,train_ann,test_ann)
-    	print 'SVM'
+    	print 'SVM:'
     	SVMclassification(train_set,test_set,train_ann,test_ann)
-    	print 'LDA'
+    	print 'LDA:'
     	LDAclassification(train_set,test_set,train_ann,test_ann)
     elif train_perc == 1.0:	#cross validation
 	video_cross_validation(video_list)
@@ -233,7 +233,7 @@ def video_cross_validation(video_list):
 	test = video_list[i]
 	train = video_list[0:i] + video_list[i+1:]
 
-	print '\n-------------------------------------------------------------Round ',i,':'
+	print '\n-------------------------------------------------------------\nRound ',i,':'
 	cross_validation(train, test)
 	
 
@@ -247,7 +247,7 @@ def video_cross_validation(video_list):
     NB_rec = float(sum(NB_recall_array) / len(NB_recall_array))
     LDA_rec = float(sum(LDA_recall_array) / len(LDA_recall_array))
 
-    print 'Total Results: \nNB accuracy = {} % NB precision {} % NB recall {} % \n LDA accuracy = {} % LDA precision {} % LDA recall {} % '.format(NB_acc, NB_prec, NB_rec, LDA_acc, LDA_prec, LDA_rec)
+    print '\nTotal Results: \n- NB accuracy = {} % NB precision {} % NB recall {} % \n- LDA accuracy = {} % LDA precision {} % LDA recall {} % '.format(NB_acc, NB_prec, NB_rec, LDA_acc, LDA_prec, LDA_rec)
 
 
 def cross_validation(train, test):
@@ -286,7 +286,7 @@ def cross_validation(train, test):
     
     test_features = feature_extraction(test_points)
 
-    print 'PCA + NB'
+    print 'PCA + NB:'
     acc,prec,rec = NB_PCAclassification(train_features, test_features, train_annotations, test_annotations)
     NB_accuracy_array.append(acc)
     NB_precision_array.append(prec)
@@ -299,7 +299,7 @@ def cross_validation(train, test):
     SVM_recall_array.append(rec)
     '''
    
-    print 'LDA'
+    print 'LDA:'
     acc,prec,rec = LDAclassification(train_features, test_features, train_annotations, test_annotations)
     LDA_accuracy_array.append(acc)
     LDA_precision_array.append(prec)
@@ -308,7 +308,7 @@ def cross_validation(train, test):
 
 def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
 
-    global path
+    global path, train_perc
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -326,8 +326,9 @@ def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
 
 
     #store the classifier and the pca object
-    #pickle.dump( gaussian_nb, open(path+"GaussianNB_classifier.p", "wb+" ) )
-    #pickle.dump( pca, open(path+"PCA_object.p", "wb+"))
+    if train_perc<1.0:
+    	pickle.dump( gaussian_nb, open(path+"GaussianNB_classifier.p", "wb+" ) )
+    	pickle.dump( pca, open(path+"PCA_object.p", "wb+"))
 
     #convert test data to suitable format and test the NB classifier
     normalized_test = zscore(test_set)
@@ -342,7 +343,7 @@ def NB_PCAclassification(train_set,test_set,train_ann,test_ann):
 
 def SVMclassification(train_set,test_set,train_ann,test_ann):
   
-    global path
+    global path, train_perc
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -353,7 +354,8 @@ def SVMclassification(train_set,test_set,train_ann,test_ann):
     results = classifier.fit(train_set, train_ann).predict(test_set)
  
     #store the trained classifier
-    #pickle.dump( classifier, open(path+"SVM_classifier.p", "wb+" ) )
+    if train_perc<1.0:
+    	pickle.dump( classifier, open(path+"SVM_classifier.p", "wb+" ) )
 
     cm = confusion_matrix(test_ann, results)
 
@@ -363,7 +365,7 @@ def SVMclassification(train_set,test_set,train_ann,test_ann):
 
 def LDAclassification(train_set,test_set,train_ann,test_ann):
 
-    global path
+    global path, train_perc
 
     #Create z-scored data
     normalized_train = zscore(train_set)
@@ -374,7 +376,8 @@ def LDAclassification(train_set,test_set,train_ann,test_ann):
     classifier.fit(train_set, train_ann)
 
     #store the trained classifier
-    #pickle.dump( classifier, open(path+"LDA_classifier.p", "wb+" ) )
+    if train_perc<1.0:
+    	pickle.dump( classifier, open(path+"LDA_classifier.p", "wb+" ) )
         
     results = classifier.predict(test_set)
  
