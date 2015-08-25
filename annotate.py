@@ -9,7 +9,8 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 import time
 from mytools import princomp,dbscan
-from myhog import hog
+#from myhog import hog
+from skimage.feature import hog
 from scipy import special
 from scipy.stats.mstats import zscore
 from gridfit import gridfit
@@ -300,6 +301,7 @@ def offline_train():
                     if slot_count==limit-1 :
                         build_classifier(np.array(all_hogs),np.array(annotations))
                         save_data()
+			save_clouds(np.array(annotations), point_clouds)
                         exit()
                     if slot_count>limit:
                         print 'EXITING'

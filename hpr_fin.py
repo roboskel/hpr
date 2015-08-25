@@ -14,7 +14,8 @@ import os.path
 import time
 from os import listdir
 from os.path import isfile, join, splitext
-from myhog import hog
+#from myhog import hog
+from skimage.feature import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 from scipy import interpolate
@@ -174,6 +175,17 @@ def laser_listener():
             else:
                 print 'Try again'
 
+    if metrics == 1:
+	global store_file
+
+	print 'Please give a filename for storage.'
+	filename = raw_input()
+	if filename != '':
+	    store_file = filename
+	else:
+	    print 'You have to give a valid filename.'
+	    exit()
+
     print "metrics: ",metrics
     print "Classifier object path : ", class_path 
     print "PCA object path : ", pca_path
@@ -213,7 +225,7 @@ def laser_listener():
 
     if metrics == 1:
     	get_accuracy(all_annotations,tot_results)
-    #save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
+    	save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
     print "D O N E !"
     #Calculate_Metrics(annotated_data)
     #sys.exit()
@@ -378,6 +390,7 @@ def initialize_plots(wall_cart):
     return plot2d,plot3d,plot_align
 
 def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
+    global store_file
 
     b={}
     b['point_clouds']=point_clouds
@@ -386,7 +399,7 @@ def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
     b['hogs']=hogs
     b['annotations']=annotations
 
-    sio.savemat('new_data/video1_data.mat',b);
+    sio.savemat(store_file+'.mat',b);
     
 
 def translate_cluster(x, y, z) :
@@ -413,10 +426,8 @@ def multiply_array(x,y,z, V) :
     new_x=[]
     new_y=[]
     new_z=[]
-    
 
     for i in range(0, len(x)):
-	#for j in range(0,len(V)):
 	new_x.append(x[i]*V[0][0] + y[i]*V[0][1] + z[i]*V[0][2])
 	new_y.append(x[i]*V[1][0] + y[i]*V[1][1] + z[i]*V[1][2])
 	new_z.append(x[i]*V[2][0] + y[i]*V[2][1] + z[i]*V[2][2])
@@ -438,7 +449,7 @@ def clustering_procedure(clear_data, num_c):
     colors=[]
     align_cl=[]	#contains the aligned data clouds of each cluster
     vcl=[] #Valid Cluster Labels 
-    valid_flag=0 #this flag is only set if we have at leat one valid cluster
+    valid_flag=0 #this flag is only set if we have at least one valid cluster
 
     Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
 
@@ -483,7 +494,7 @@ def clustering_procedure(clear_data, num_c):
 	
 	    vcl.append(k)
             colors.append(ccnames[k%12])
-            grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
+            grid=gridfit(alignment_result[2], alignment_result[0], alignment_result[1], 16, 16) #extract surface - y,z,x alignment_result[1]
 	    all_gridfit.append(grid)
 
             grid=grid-np.amin(grid)
@@ -493,7 +504,8 @@ def clustering_procedure(clear_data, num_c):
 	    all_hogs.append(f)
             hogs.append(f)  #extract hog features
 
-
+	    plt.imshow(grid, cmap = 'gray', interpolation = 'bicubic')
+	    plt.show()
     
     fig1.show()
     fig4.show()
@@ -609,7 +621,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #human
-		#ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
+		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
@@ -618,7 +630,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #object
-		#ax.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
+		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
@@ -643,8 +655,6 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
             		else:
                 		all_annotations=np.hstack((all_annotations,np.array(ha)))
 				
-
-	   
 
 
 	pickle.dump(store_results, open('stored_predictions.p','a'))
