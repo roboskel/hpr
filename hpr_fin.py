@@ -450,6 +450,7 @@ def clustering_procedure(clear_data, num_c):
     align_cl=[]	#contains the aligned data clouds of each cluster
     vcl=[] #Valid Cluster Labels 
     valid_flag=0 #this flag is only set if we have at least one valid cluster
+    grids=[]
 
     Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
 
@@ -461,18 +462,19 @@ def clustering_procedure(clear_data, num_c):
 
     fig1.clear()
     fig4.clear()
-    
 
     #for every created cluster - its data points
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
-	    print 'cluster ',k
+	    print ' cluster ',k
 
             valid_flag=1
 
 	    #points of every cluster at each timewindow-frame
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
+
+	    speed(xk,yk,zk)
 	    trans_matrix =[[xk,yk,zk]]
 	    all_clusters.append([xk,yk,zk])
 
@@ -491,27 +493,26 @@ def clustering_procedure(clear_data, num_c):
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
-	
 	    vcl.append(k)
             colors.append(ccnames[k%12])
             grid=gridfit(alignment_result[2], alignment_result[0], alignment_result[1], 16, 16) #extract surface - y,z,x alignment_result[1]
 	    all_gridfit.append(grid)
 
             grid=grid-np.amin(grid)
+	    grids.append(grid)
 
 	    features=hog(grid)
 	    f=hog(grid, orientations=6, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualise=False)
 	    all_hogs.append(f)
             hogs.append(f)  #extract hog features
 
-	    plt.imshow(grid, cmap = 'gray', interpolation = 'bicubic')
-	    plt.show()
+	    
     
     fig1.show()
     fig4.show()
 
 
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl)
+    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
 
 
 
@@ -536,7 +537,7 @@ def get_accuracy(ann, results):
 
 
 #TO DO
-def speed(num_c,xnea,ynew,znew):
+def steps(num_c,xnew,ynew,znew):
 
     global pol_degree
 
@@ -564,8 +565,48 @@ def speed(num_c,xnea,ynew,znew):
 
 	print 'std={} '.format(std)
 
+def speed(x, y, z) :
 
-def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
+    global z_scale
+
+    z_angle = z[0]
+    dist = 0.0
+    scan_speed1 = 0.0
+    mean_array = []
+
+    while z_angle <= z[len(z)-1]:
+    	z_filter = np.where(z==z_angle)
+
+    	[xi, yi] = [x[z_filter], y[z_filter]]
+  
+    	if len(xi) !=0 and len(yi) !=0:
+		'''
+		x1=xi[0]
+		y1=yi[0]
+		x2=xi[len(xi)-1]
+		y2=yi[len(yi)-1]
+		'''
+
+		mean_array.append([np.median(xi), np.median(yi)])
+	
+		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+
+	z_angle = z_angle + z_scale
+
+    d = 0.0
+    for i in range(0,len(mean_array)-1):
+	d = d + math.sqrt(pow(mean_array[i+1][0] - mean_array[i][0], 2) + pow(mean_array[i+1][1] - mean_array[i][1], 2))
+
+    #compute the speed at each scan -> m/sec
+    scan_speed = d/(z_angle - z[0])
+    #scan_speed1=0.0
+    #scan_speed1=dist/(z_angle - z[0])
+
+    print ' SPEED = ',scan_speed
+    #print ' speed2 = ',scan_speed1
+
+
+def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
     
     global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4,kat
     global annotations, first_time, all_annotations,annotated_humans,annotated_obstacles
@@ -578,20 +619,19 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
     centerz = []
 
 
-
     #zscore the entire hogs table, not single cluster hogs
     if flag==1:
         kat.clear()
         kat.plot(wall_cart[:,0],wall_cart[:,1])
 
         if np.array(hogs).shape==(1,36):
-            temp = zscore(np.array(hogs)[0])
-            #temp = np.array(hogs)[0]
+            #temp = zscore(np.array(hogs)[0])
+            temp = np.array(hogs)[0]
 
         else:
             for i in range(0,len(hogs)):
-                temp.append(zscore(np.array(hogs[i])))
-                #temp.append(np.array(hogs[i]))
+                #temp.append(zscore(np.array(hogs[i])))
+                temp.append(np.array(hogs[i]))
         
 
 	#temp_pca = pca_obj.transform(temp)
@@ -635,7 +675,9 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl):
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
                 #fig4.add_axes(ax3)
-	    
+
+	    #plt.imshow(grids[cnt], cmap = 'gray', interpolation = 'bicubic')
+	    #plt.show()
 	    cnt=cnt+1
 	    #fig1.show()
             plt.pause(0.0001)
