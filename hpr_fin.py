@@ -46,6 +46,7 @@ sub_topic = 'scan'
 #metrics=0
 total_cluster_time = 0
 hogs_temp=[]
+scan_parts = 5
 
 annotated_humans = 0
 annotated_obstacles = 0
@@ -541,20 +542,21 @@ def get_accuracy(ann, results):
 #TO DO
 def steps(x, y, z):
 
-    global z_scale
+    global z_scale, scan_parts
 
     z_angle = z[0]
     count = 0 
     xk = []
     yk = []
     zk = []
+    deviation = []
 
     c=0
     
     while z_angle <= z[len(z)-1]:
     	z_filter = np.where(z==z_angle)
 	
-	if count < 5:
+	if count < scan_parts:
 	    
 	    for i in range(0, len(x[z_filter])):
 	        xk.append(x[z_filter][i])
@@ -565,8 +567,8 @@ def steps(x, y, z):
     	    if len(xk) !=0 and len(yk) !=0:
 
 		arr = np.array([xk,yk])
-		print 'standard dev = {}'.format(np.std(arr))
-		#print 'variance = {}'.format(np.var(arr))
+		#print 'standard dev = {}'.format(np.std(arr))
+		deviation.append(np.std(arr))
 		del xk[:]
 		del yk[:]
 		del zk[:]
@@ -576,8 +578,7 @@ def steps(x, y, z):
 	    	    yk.append(y[z_filter][i])
 		    zk.append(z[z_filter][i])
 		count = 0
-		c=c+1
-		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+
 	    
 	count = count+1
 	z_angle = z_angle + z_scale
@@ -585,15 +586,25 @@ def steps(x, y, z):
 	
     if len(xk) !=0 and len(yk) != 0:
 	arr = np.array([xk,yk])
-	print 'standard dev = {}'.format(np.std(arr))
-	c=c+1
+	#print 'standard dev = {}'.format(np.std(arr))
+	deviation.append(np.std(arr))
 
-    print 'num of parts ',c
+    step = 0
+    temp_i = 1
+    for i in range(0, len(deviation)-1):
+	diff = abs(deviation[i+1] - deviation[temp_i])
+
+	if diff>=0.1 :
+	    step = step + 1
+	    temp_i = i
+
+    print 'steps : ',step
+
 
 
 def speed(x, y, z) :
 
-    global z_scale
+    global z_scale, scan_parts
 
     z_angle = z[0]
     dist = 0.0
@@ -608,7 +619,7 @@ def speed(x, y, z) :
     while z_angle <= z[len(z)-1]:
     	z_filter = np.where(z==z_angle)
 	
-	if count < 5:
+	if count < scan_parts:
 	    
 	    for i in range(0, len(x[z_filter])):
 	        xk.append(x[z_filter][i])
@@ -631,6 +642,9 @@ def speed(x, y, z) :
 	count = count+1
 	z_angle = z_angle + z_scale
 	
+
+    if len(xk) !=0 and len(yk) !=0:
+	mean_array.append([np.median(xk), np.median(yk)])
 
     d = 0.0
     for i in range(0,len(mean_array)-1):
