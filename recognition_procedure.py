@@ -183,7 +183,7 @@ def feature_extraction(points):
 	alignment_result=multiply_array(xnew,ynew,znew, V)
 	all_align.append(alignment_result)
 
-	grid=gridfit(alignment_result[2], alignment_result[0], alignment_result[1] , 16, 16) #extract surface - y,z,x alignment_result[1]      alignment_result[0], alignment_result[1], alignment_result[2]   xi,yi,zi
+	grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2] , 16, 16) #extract surface - y,z,x alignment_result[1]      alignment_result[0], alignment_result[1], alignment_result[2]   xi,yi,zi
 
 	grid=grid-np.amin(grid)
 	all_grids.append(grid)

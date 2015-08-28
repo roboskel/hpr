@@ -489,13 +489,15 @@ def clustering_procedure(clear_data, num_c):
 	    #(traslation matrix) x (rotation matrix) = alignemt of cluster
 	    #alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
+	
+	    steps(xk,yk,zk)
 	    
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
 	    vcl.append(k)
             colors.append(ccnames[k%12])
-            grid=gridfit(alignment_result[2], alignment_result[0], alignment_result[1], 16, 16) #extract surface - y,z,x alignment_result[1]
+            grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
 	    all_gridfit.append(grid)
 
             grid=grid-np.amin(grid)
@@ -537,33 +539,57 @@ def get_accuracy(ann, results):
 
 
 #TO DO
-def steps(num_c,xnew,ynew,znew):
+def steps(x, y, z):
 
-    global pol_degree
+    global z_scale
 
-    pp=0
-    prev=0
-    count=0
-    std=[]
-	    
-    for p in range(0,len(num_c)) :
-		
-	if count<=pol_degree:
-	    pp=pp+num_c[p]
-	    count=count+1
-	    continue
+    z_angle = z[0]
+    count = 0 
+    xk = []
+    yk = []
+    zk = []
 
-	[xp,yp,zp]=[xnew[prev:prev+pp-1], ynew[prev:prev+pp-1], znew[prev:prev+pp-1]]
-	if(len(xp)==0):
-	    break
-
-	std.append(np.var([xp,yp,zp]))
+    c=0
+    
+    while z_angle <= z[len(z)-1]:
+    	z_filter = np.where(z==z_angle)
 	
-	prev=pp+prev
-	pp=0
-	count=0
+	if count < 5:
+	    
+	    for i in range(0, len(x[z_filter])):
+	        xk.append(x[z_filter][i])
+	        yk.append(y[z_filter][i])
+		zk.append(z[z_filter][i])
+	else:
+	    
+    	    if len(xk) !=0 and len(yk) !=0:
 
-	print 'std={} '.format(std)
+		arr = np.array([xk,yk])
+		print 'standard dev = {}'.format(np.std(arr))
+		#print 'variance = {}'.format(np.var(arr))
+		del xk[:]
+		del yk[:]
+		del zk[:]
+
+		for i in range(0, len(x[z_filter])):
+		    xk.append(x[z_filter][i])
+	    	    yk.append(y[z_filter][i])
+		    zk.append(z[z_filter][i])
+		count = 0
+		c=c+1
+		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+	    
+	count = count+1
+	z_angle = z_angle + z_scale
+	
+	
+    if len(xk) !=0 and len(yk) != 0:
+	arr = np.array([xk,yk])
+	print 'standard dev = {}'.format(np.std(arr))
+	c=c+1
+
+    print 'num of parts ',c
+
 
 def speed(x, y, z) :
 
@@ -573,25 +599,38 @@ def speed(x, y, z) :
     dist = 0.0
     scan_speed1 = 0.0
     mean_array = []
+    count = 0 
+    xk = []
+    yk = []
+    
 
+    
     while z_angle <= z[len(z)-1]:
     	z_filter = np.where(z==z_angle)
-
-    	[xi, yi] = [x[z_filter], y[z_filter]]
-  
-    	if len(xi) !=0 and len(yi) !=0:
-		'''
-		x1=xi[0]
-		y1=yi[0]
-		x2=xi[len(xi)-1]
-		y2=yi[len(yi)-1]
-		'''
-
-		mean_array.append([np.median(xi), np.median(yi)])
 	
-		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+	if count < 5:
+	    
+	    for i in range(0, len(x[z_filter])):
+	        xk.append(x[z_filter][i])
+	        yk.append(y[z_filter][i])
+	else:
+	    
+    	    if len(xk) !=0 and len(yk) !=0:
 
+		mean_array.append([np.median(xk), np.median(yk)])
+		del xk[:]
+		del yk[:]
+
+		for i in range(0, len(x[z_filter])):
+		    xk.append(x[z_filter][i])
+	    	    yk.append(y[z_filter][i])
+		count = 0
+
+		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
+	    
+	count = count+1
 	z_angle = z_angle + z_scale
+	
 
     d = 0.0
     for i in range(0,len(mean_array)-1):
@@ -599,11 +638,8 @@ def speed(x, y, z) :
 
     #compute the speed at each scan -> m/sec
     scan_speed = d/(z_angle - z[0])
-    #scan_speed1=0.0
-    #scan_speed1=dist/(z_angle - z[0])
 
     print ' SPEED = ',scan_speed
-    #print ' speed2 = ',scan_speed1
 
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
