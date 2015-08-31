@@ -20,6 +20,7 @@ from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 from scipy import interpolate
 from sklearn.decomposition import PCA
+from scipy.spatial import ConvexHull
 
 ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
 cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
@@ -491,7 +492,31 @@ def clustering_procedure(clear_data, num_c):
 	    #alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	
+	    #print 'x = {} \n align_x = {}'.format(xk, alignment_result[0])
 	    steps(xk,yk,zk)
+	    '''
+	    points = []
+	    points.append([xk[0],yk[0]])
+	
+	    for i in range(1,len(xk)) :
+		points.append([xk[i],yk[i]])
+
+	    #print 'PP {}'.format(points)
+	    hull = ConvexHull(points)
+	    
+	    hull_indices = np.unique(hull.simplices.flat)
+	    print 'HULL {}'.format(hull_indices)
+	    hull_pts = []
+	    for j in range(0, len(hull_indices)):
+		index = hull_indices[j]
+	    	hull_pts.append(points[index])
+	    #print 'hull_pts {}'.format(hull_pts)
+	    
+
+	    #plt.plot(points[:, 0], points[:, 1], 'ko', markersize=10)
+	    plt.plot(hull_pts[:, 0], hull_pts[:, 1], 'ro', alpha=.25, markersize=20)
+	    plt.show()
+	    '''
 	    
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
@@ -512,7 +537,7 @@ def clustering_procedure(clear_data, num_c):
 	    
     
     fig1.show()
-    fig4.show()
+    #fig4.show()
 
 
     update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
@@ -542,7 +567,7 @@ def get_accuracy(ann, results):
 #TO DO
 def steps(x, y, z):
 
-    global z_scale, scan_parts
+    global z_scale, scan_parts,ax3,fig4
 
     z_angle = z[0]
     count = 0 
@@ -550,25 +575,54 @@ def steps(x, y, z):
     yk = []
     zk = []
     deviation = []
+    dev2 = []
+    dev3 = []
+    xmed = []
+    ymed = []
+    zmed = []
 
     c=0
     
     while z_angle <= z[len(z)-1]:
     	z_filter = np.where(z==z_angle)
-	
+
 	if count < scan_parts:
-	    
 	    for i in range(0, len(x[z_filter])):
 	        xk.append(x[z_filter][i])
 	        yk.append(y[z_filter][i])
 		zk.append(z[z_filter][i])
+
 	else:
 	    
     	    if len(xk) !=0 and len(yk) !=0:
-
-		arr = np.array([xk,yk])
+		ax3.scatter(xk,yk, zk, 'z', 30, cc[c%12]) 
+		fig4.add_axes(ax3)
+		fig4.show()
+		arr = np.array([xk,yk,zk])
 		#print 'standard dev = {}'.format(np.std(arr))
-		deviation.append(np.std(arr))
+		
+		deviation.append(round(np.std(arr),2))
+
+		xmean = np.median(np.array(xk))
+		ymean = np.median(np.array(yk))
+		zmean = np.median(np.array(zk))
+
+		xavg = np.average(np.array(xk))
+		yavg = np.average(np.array(yk))
+		zavg = np.average(np.array(zk))
+	
+		sumx = 0.0
+		sumy = 0.0
+		sumz = 0.0
+		for m in range(0,len(xk)):
+		    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)# + pow((zk[m] - zmean), 2)
+		    sumy = sumy + pow((xk[m] - xavg), 2) + pow((yk[m] - yavg), 2) + pow((zk[m] - zavg), 2)
+		    #sumy = sumy + pow((yk[m] - ymean), 2)
+		    #sumz = sumz + pow((xz[m] - zmean), 2)
+
+		dev2.append(round((math.sqrt(sumx/len(xk))),2))
+		dev3.append(round((math.sqrt(sumy/len(xk))),2))
+
 		del xk[:]
 		del yk[:]
 		del zk[:]
@@ -578,6 +632,7 @@ def steps(x, y, z):
 	    	    yk.append(y[z_filter][i])
 		    zk.append(z[z_filter][i])
 		count = 0
+		c=c+1
 
 	    
 	count = count+1
@@ -585,9 +640,16 @@ def steps(x, y, z):
 	
 	
     if len(xk) !=0 and len(yk) != 0:
-	arr = np.array([xk,yk])
+	arr = np.array([xk,yk,zk])
 	#print 'standard dev = {}'.format(np.std(arr))
-	deviation.append(np.std(arr))
+	deviation.append(round(np.std(arr),2))
+
+	sumx = 0.0
+	xmean = np.median(np.array(xk))
+	ymean = np.median(np.array(yk))
+	for m in range(0,len(xk)):
+	    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)# + pow((zk[m] - zmean), 2)
+	dev2.append(round((math.sqrt(sumx/len(xk))),2))
 
     step = 0
     temp_i = 1
@@ -597,6 +659,13 @@ def steps(x, y, z):
 	if diff>=0.1 :
 	    step = step + 1
 	    temp_i = i
+
+    dev = np.array(deviation)
+   # min_dev = np.where(dev == dev.min())
+
+    print 'deviation : {} \n '.format(deviation)
+    print 'dev2 {}'.format(dev2)
+    print 'dev3 {}'.format(dev3)
 
     print 'steps : ',step
 
