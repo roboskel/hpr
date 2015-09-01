@@ -576,7 +576,7 @@ def steps(x, y, z):
     zk = []
     deviation = []
     dev2 = []
-    dev3 = []
+
     xmed = []
     ymed = []
     zmed = []
@@ -615,13 +615,9 @@ def steps(x, y, z):
 		sumy = 0.0
 		sumz = 0.0
 		for m in range(0,len(xk)):
-		    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)# + pow((zk[m] - zmean), 2)
-		    sumy = sumy + pow((xk[m] - xavg), 2) + pow((yk[m] - yavg), 2) + pow((zk[m] - zavg), 2)
-		    #sumy = sumy + pow((yk[m] - ymean), 2)
-		    #sumz = sumz + pow((xz[m] - zmean), 2)
+		    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)
 
 		dev2.append(round((math.sqrt(sumx/len(xk))),2))
-		dev3.append(round((math.sqrt(sumy/len(xk))),2))
 
 		del xk[:]
 		del yk[:]
@@ -641,14 +637,13 @@ def steps(x, y, z):
 	
     if len(xk) !=0 and len(yk) != 0:
 	arr = np.array([xk,yk,zk])
-	#print 'standard dev = {}'.format(np.std(arr))
 	deviation.append(round(np.std(arr),2))
 
 	sumx = 0.0
 	xmean = np.median(np.array(xk))
 	ymean = np.median(np.array(yk))
 	for m in range(0,len(xk)):
-	    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)# + pow((zk[m] - zmean), 2)
+	    sumx = sumx + pow((xk[m] - xmean), 2) + pow((yk[m] - ymean), 2)
 	dev2.append(round((math.sqrt(sumx/len(xk))),2))
 
     step = 0
@@ -665,9 +660,51 @@ def steps(x, y, z):
 
     print 'deviation : {} \n '.format(deviation)
     print 'dev2 {}'.format(dev2)
-    print 'dev3 {}'.format(dev3)
 
+    steps_from_deviation(dev2)
     print 'steps : ',step
+
+
+def steps_from_deviation(deviation) :
+
+    min_list = []	#list with all the minimum indexes
+    max_list = []
+    steps = 0
+
+    num = len(deviation)
+    if num % 2 != 0:
+	deviation.append(deviation[len(deviation)-1])
+	num = num +1
+    
+    #print 'num {}   dev {}'.format(num,deviation)
+    split = num/2
+    dev = np.array(deviation)
+
+    max_ar = dev.argsort()[-split:][::-1]
+    min_ar = dev.argsort()[:split]
+
+    print 'test = {} t2 {} '.format(max_ar,min_ar)
+    
+    min_ar.sort()
+    max_ar.sort()
+    
+    print 'min_ar = {} max_ar = {}'.format(min_ar,max_ar)
+    diff=0
+    for i in range(0,len(min_ar)-1) :
+	diff = abs(min_ar[i+1] - min_ar[i])
+	
+	if diff != 1:
+	    steps = steps +1
+
+    diff=0
+    for i in range(0,len(max_ar)-1) :
+	diff = abs(max_ar[i+1] - max_ar[i])
+	
+	if diff != 1:
+	    steps = steps +1
+
+    print 'NEW!! steps = ',steps
+
 
 
 
