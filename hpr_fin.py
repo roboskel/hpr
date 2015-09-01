@@ -521,6 +521,8 @@ def clustering_procedure(clear_data, num_c):
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
+	    steps2(alignment_result[0], alignment_result[1], alignment_result[2])
+
 	    vcl.append(k)
             colors.append(ccnames[k%12])
             grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
@@ -563,8 +565,44 @@ def get_accuracy(ann, results):
     print 'acc = {}'.format(acc)
 
 
+def steps2(x, y, z):
 
-#TO DO
+    global scan_parts
+
+    print 'STEPS2'
+    num = 0
+    split = len(x)/scan_parts
+    dev2 = []
+    flag = False
+
+    while num <= len(x) :
+	xn = x[num:num+split]
+	yn = y[num:num+split]
+	zn = z[num:num+split]
+	
+	if len(xn) != 0 and len(yn)!=0 and len(zn)!=0 :
+		xmean = np.median(np.array(xn))
+		ymean = np.median(np.array(yn))
+		zmean = np.median(np.array(zn))
+
+	
+		sumx = 0.0
+
+		for m in range(0,len(xn)):
+	    		sumx = sumx + pow((xn[m] - xmean), 2) + pow((yn[m] - ymean), 2)
+
+		dev2.append(round((math.sqrt(sumx/len(xn))),2))
+	num = num + split
+	
+	if len(x)-num < split :
+	    	split = len(x)-num
+		flag = True
+	if flag == True:
+		break
+
+    steps_from_deviation(dev2)
+
+
 def steps(x, y, z):
 
     global z_scale, scan_parts,ax3,fig4
