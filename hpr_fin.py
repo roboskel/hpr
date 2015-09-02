@@ -493,7 +493,7 @@ def clustering_procedure(clear_data, num_c):
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	
 	    #print 'x = {} \n align_x = {}'.format(xk, alignment_result[0])
-	    steps(xk,yk,zk)
+	    #steps(xk,yk,zk)
 	    '''
 	    points = []
 	    points.append([xk[0],yk[0]])
@@ -565,13 +565,176 @@ def get_accuracy(ann, results):
     print 'acc = {}'.format(acc)
 
 
+def compute_steps(dev) :
+
+    error = 0.01
+    min_array = []
+    max_array = []
+    m = round(sum(dev)/len(dev),2)
+
+    print 'compute steps ... '
+
+    if dev[0] < dev[1] :
+	print 'dev[0] < dev[1]'
+	#if abs(dev[1]-dev[0]) > error:
+	if diff_error2(dev[0], m):
+	    min_array.append(0)
+
+    elif dev[0] > dev[1] :
+	print 'dev[0] > dev[1]'
+	#if abs(dev[1]-dev[0]) > error:
+	if diff_error2(dev[0], m):
+	    max_array.append(0)
+
+    for i in range(1,len(dev)-1) :
+	print ' ... ',dev[i]
+	if dev[i-1] <= dev[i] and dev[i] > dev[i+1] :
+	    print 'tha mpei san max '
+	    #if diff_error(dev[i-1], dev[i], dev[i+1]):
+	    if diff_error2(dev[i], m):
+	    	max_array.append(i)
+
+	elif dev[i-1] >= dev[i] and dev[i] < dev[i+1]:
+	    print 'tha mpei san min'
+	    #if diff_error(dev[i-1], dev[i], dev[i+1]):
+	    if diff_error2(dev[i], m):
+	    	min_array.append(i)
+
+	else:
+	    continue
+
+    '''
+	elif dev[i-1] == dev[i] and dev[i+1] > dev[i]:
+	    if diff_error(dev[i-1], dev[i], dev[i+1]):
+	    	min_array.append(i)
+    '''
+
+
+    if dev[len(dev)-2] < dev[len(dev)-1] :
+	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
+	if diff_error2(dev[len(dev)-1], m):
+	    max_array.append(len(dev)-1)
+
+    elif dev[len(dev)-2] > dev[len(dev)-1] :
+	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
+	if diff_error2(dev[len(dev)-1], m):
+	    min_array.append(len(dev)-1)
+    elif dev[len(dev)-2] == dev[len(dev)-1] :
+	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
+	if diff_error2(dev[len(dev)-1], m):
+	    max_array.append(len(dev)-1)
+    print 'max = {}    min = {}'.format(max_array, min_array)
+
+
+
+
+    steps = 0.0
+
+    if len(min_array) == 0 and len(max_array) == 0 or len(min_array) == 0 and len(max_array) == 1 or len(min_array) == 1 and len(max_array) == 0 or len(min_array) == 1 and len(max_array) == 1:
+	steps = 0
+    elif len(max_array) >= 2 and (len(min_array) == 1 or len(min_array) == 0): 
+	new_max = []
+    	for i in range(0, len(max_array)-1) :
+	    if max_array[i] +1 != max_array[i+1]:
+	   	new_max.append(max_array[i])
+
+    	if max_array[len(max_array)-2] +1 != max_array[len(max_array)-1]:
+	    new_max.append(max_array[len(max_array)-1])
+	
+	steps = len(new_max) - 1
+    elif len(min_array) >= 2 and (len(max_array) == 1 or len(max_array) == 0): 
+	new_min = []
+    	for i in range(0, len(min_array)-1) :
+	    if min_array[i] +1 != min_array[i+1]:
+	   	new_min.append(min_array[i])
+
+        if min_array[len(min_array)-2] +1 != min_array[len(min_array)-1]:
+	    new_min.append(min_array[len(min_array)-1])
+	
+	steps = len(new_min) - 1
+    else:
+    	new_min = []
+        for i in range(0, len(min_array)-1) :
+	    if min_array[i] +1 != min_array[i+1]:
+	   	new_min.append(min_array[i])
+
+        if min_array[len(min_array)-2] +1 != min_array[len(min_array)-1]:
+	    new_min.append(min_array[len(min_array)-1])
+
+	new_max = []
+    	for i in range(0, len(max_array)-1) :
+	    if max_array[i] +1 != max_array[i+1]:
+	   	new_max.append(max_array[i])
+
+    	if max_array[len(max_array)-2] +1 != max_array[len(max_array)-1]:
+	    new_max.append(max_array[len(max_array)-1])
+
+	if len(new_min) == 0 and len(new_max) == 0 or len(new_min) == 0 and len(new_max) == 1 or len(new_min) == 1 and len(new_max) == 0 or len(new_min) == 1 and len(new_max) == 1:
+	    steps = 0
+    	elif len(new_max) >= 2 and (len(new_min) == 1 or len(new_min) == 0): 
+	    steps = len(new_max) - 1
+	elif len(new_min) >= 2 and (len(new_max) == 1 or len(new_max) == 0): 
+	    steps = len(new_min) - 1
+	else:
+	    if new_min[0] > new_max[0]:
+		first = new_max
+		second = new_min
+	    else:
+		first = new_min
+		second = new_max
+	    fv1 = first[0]
+	    fv2 = first[1]
+	    del first[0]
+	    #del first[1]
+	    steps = steps + 1.0
+
+	    while len(first) != 0 and len(second) != 0:
+		if fv1 < second[0] and fv2 > second[0]:
+		    steps = steps + 0.5
+		else:
+		    steps = steps + 1.0
+
+		if len(second) == 1:
+		    break
+		fv1 = second[0]
+		fv2 = second[1]
+		del second[0]
+		#del second[1]
+	
+		temp = first
+		first = second
+		second = temp
+    
+	    if len(first) >=2:
+		steps = steps + len(first) -1
+
+    print 'steps !!!! ',steps
+
+
+def diff_error(prev, value, next):
+
+    error = 0.01
+
+    if abs(value - prev)<=error and abs(next - value)<= error:
+	return False
+    
+    return True
+
+def diff_error2(value, m):
+
+    error = 0.005
+
+    if abs(value - m)<=error :
+	return False
+    
+    return True
+
 def steps2(x, y, z):
 
     global scan_parts
 
-    print 'STEPS2'
     num = 0
-    split = len(x)/scan_parts
+    split = len(x)/6
     dev2 = []
     flag = False
 
@@ -600,7 +763,9 @@ def steps2(x, y, z):
 	if flag == True:
 		break
 
+    print 'deviation = {}'.format(dev2)
     steps_from_deviation(dev2)
+    compute_steps(dev2)
 
 
 def steps(x, y, z):
