@@ -48,6 +48,7 @@ sub_topic = 'scan'
 total_cluster_time = 0
 hogs_temp=[]
 scan_parts = 5
+step_parts = 6
 
 annotated_humans = 0
 annotated_obstacles = 0
@@ -493,7 +494,7 @@ def clustering_procedure(clear_data, num_c):
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	
 	    #print 'x = {} \n align_x = {}'.format(xk, alignment_result[0])
-	    #steps(xk,yk,zk)
+	    steps2(xk,yk,zk)
 	    '''
 	    points = []
 	    points.append([xk[0],yk[0]])
@@ -521,7 +522,7 @@ def clustering_procedure(clear_data, num_c):
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
-	    steps2(alignment_result[0], alignment_result[1], alignment_result[2])
+	    #steps2(alignment_result[0], alignment_result[1], alignment_result[2])
 
 	    vcl.append(k)
             colors.append(ccnames[k%12])
@@ -565,69 +566,55 @@ def get_accuracy(ann, results):
     print 'acc = {}'.format(acc)
 
 
+#gets the local minimums and maximums of the st.deviation matrix
+#tries to compute the number of the steps with the use of this information
 def compute_steps(dev) :
 
-    error = 0.01
     min_array = []
     max_array = []
     m = round(sum(dev)/len(dev),2)
 
-    print 'compute steps ... '
+    #print 'compute steps ... '
 
     if dev[0] < dev[1] :
-	print 'dev[0] < dev[1]'
-	#if abs(dev[1]-dev[0]) > error:
 	if diff_error2(dev[0], m):
 	    min_array.append(0)
 
     elif dev[0] > dev[1] :
-	print 'dev[0] > dev[1]'
-	#if abs(dev[1]-dev[0]) > error:
 	if diff_error2(dev[0], m):
 	    max_array.append(0)
 
     for i in range(1,len(dev)-1) :
-	print ' ... ',dev[i]
 	if dev[i-1] <= dev[i] and dev[i] > dev[i+1] :
-	    print 'tha mpei san max '
-	    #if diff_error(dev[i-1], dev[i], dev[i+1]):
 	    if diff_error2(dev[i], m):
 	    	max_array.append(i)
 
 	elif dev[i-1] >= dev[i] and dev[i] < dev[i+1]:
-	    print 'tha mpei san min'
-	    #if diff_error(dev[i-1], dev[i], dev[i+1]):
 	    if diff_error2(dev[i], m):
 	    	min_array.append(i)
 
 	else:
 	    continue
 
-    '''
-	elif dev[i-1] == dev[i] and dev[i+1] > dev[i]:
-	    if diff_error(dev[i-1], dev[i], dev[i+1]):
-	    	min_array.append(i)
-    '''
 
 
     if dev[len(dev)-2] < dev[len(dev)-1] :
-	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
 	if diff_error2(dev[len(dev)-1], m):
 	    max_array.append(len(dev)-1)
 
     elif dev[len(dev)-2] > dev[len(dev)-1] :
-	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
 	if diff_error2(dev[len(dev)-1], m):
 	    min_array.append(len(dev)-1)
     elif dev[len(dev)-2] == dev[len(dev)-1] :
-	#if abs(dev[len(dev)-2]-dev[len(dev)-1]) > error:
 	if diff_error2(dev[len(dev)-1], m):
 	    max_array.append(len(dev)-1)
     print 'max = {}    min = {}'.format(max_array, min_array)
 
 
 
-
+    #remove min and max that are in sequence
+    #every two min or two max -> + 1 step
+    #if a min/max is between two local max/min respectively  -> + 0.5 step
     steps = 0.0
 
     if len(min_array) == 0 and len(max_array) == 0 or len(min_array) == 0 and len(max_array) == 1 or len(min_array) == 1 and len(max_array) == 0 or len(min_array) == 1 and len(max_array) == 1:
@@ -641,7 +628,7 @@ def compute_steps(dev) :
     	if max_array[len(max_array)-2] +1 != max_array[len(max_array)-1]:
 	    new_max.append(max_array[len(max_array)-1])
 	
-	steps = len(new_max) - 1
+	steps = len(new_max) - 1.0
     elif len(min_array) >= 2 and (len(max_array) == 1 or len(max_array) == 0): 
 	new_min = []
     	for i in range(0, len(min_array)-1) :
@@ -651,7 +638,7 @@ def compute_steps(dev) :
         if min_array[len(min_array)-2] +1 != min_array[len(min_array)-1]:
 	    new_min.append(min_array[len(min_array)-1])
 	
-	steps = len(new_min) - 1
+	steps = len(new_min) - 1.0
     else:
     	new_min = []
         for i in range(0, len(min_array)-1) :
@@ -672,9 +659,9 @@ def compute_steps(dev) :
 	if len(new_min) == 0 and len(new_max) == 0 or len(new_min) == 0 and len(new_max) == 1 or len(new_min) == 1 and len(new_max) == 0 or len(new_min) == 1 and len(new_max) == 1:
 	    steps = 0
     	elif len(new_max) >= 2 and (len(new_min) == 1 or len(new_min) == 0): 
-	    steps = len(new_max) - 1
+	    steps = len(new_max) - 1.0
 	elif len(new_min) >= 2 and (len(new_max) == 1 or len(new_max) == 0): 
-	    steps = len(new_min) - 1
+	    steps = len(new_min) - 1.0
 	else:
 	    if new_min[0] > new_max[0]:
 		first = new_max
@@ -685,7 +672,6 @@ def compute_steps(dev) :
 	    fv1 = first[0]
 	    fv2 = first[1]
 	    del first[0]
-	    #del first[1]
 	    steps = steps + 1.0
 
 	    while len(first) != 0 and len(second) != 0:
@@ -699,7 +685,6 @@ def compute_steps(dev) :
 		fv1 = second[0]
 		fv2 = second[1]
 		del second[0]
-		#del second[1]
 	
 		temp = first
 		first = second
@@ -708,7 +693,9 @@ def compute_steps(dev) :
 	    if len(first) >=2:
 		steps = steps + len(first) -1
 
-    print 'steps !!!! ',steps
+    print 'Compute steps :  ',steps
+
+
 
 
 def diff_error(prev, value, next):
@@ -729,16 +716,22 @@ def diff_error2(value, m):
     
     return True
 
+
+# separate data in equal parts of points.
+# compute the standard deviation by median and not the avg of points
 def steps2(x, y, z):
 
-    global scan_parts
+    global scan_parts, step_parts
 
     num = 0
-    split = len(x)/6
+    split = len(x)/step_parts
     dev2 = []
     flag = False
 
     while num <= len(x) :
+	if flag == True:
+		break
+
 	xn = x[num:num+split]
 	yn = y[num:num+split]
 	zn = z[num:num+split]
@@ -752,7 +745,7 @@ def steps2(x, y, z):
 		sumx = 0.0
 
 		for m in range(0,len(xn)):
-	    		sumx = sumx + pow((xn[m] - xmean), 2) + pow((yn[m] - ymean), 2)
+	    		sumx = sumx + pow((xn[m] - xmean), 2) + pow((yn[m] - ymean), 2) + pow((zn[m] - zmean), 2)
 
 		dev2.append(round((math.sqrt(sumx/len(xn))),2))
 	num = num + split
@@ -760,14 +753,15 @@ def steps2(x, y, z):
 	if len(x)-num < split :
 	    	split = len(x)-num
 		flag = True
-	if flag == True:
-		break
+	
 
     print 'deviation = {}'.format(dev2)
-    steps_from_deviation(dev2)
+    #steps_from_deviation(dev2)
     compute_steps(dev2)
 
 
+# separate data in equal time parts.
+# compute the standard deviation by median and not the avg of points
 def steps(x, y, z):
 
     global z_scale, scan_parts,ax3,fig4
@@ -864,49 +858,7 @@ def steps(x, y, z):
     print 'deviation : {} \n '.format(deviation)
     print 'dev2 {}'.format(dev2)
 
-    steps_from_deviation(dev2)
-    print 'steps : ',step
-
-
-def steps_from_deviation(deviation) :
-
-    min_list = []	#list with all the minimum indexes
-    max_list = []
-    steps = 0
-
-    num = len(deviation)
-    if num % 2 != 0:
-	deviation.append(deviation[len(deviation)-1])
-	num = num +1
-    
-    #print 'num {}   dev {}'.format(num,deviation)
-    split = num/2
-    dev = np.array(deviation)
-
-    max_ar = dev.argsort()[-split:][::-1]
-    min_ar = dev.argsort()[:split]
-
-    print 'test = {} t2 {} '.format(max_ar,min_ar)
-    
-    min_ar.sort()
-    max_ar.sort()
-    
-    print 'min_ar = {} max_ar = {}'.format(min_ar,max_ar)
-    diff=0
-    for i in range(0,len(min_ar)-1) :
-	diff = abs(min_ar[i+1] - min_ar[i])
-	
-	if diff != 1:
-	    steps = steps +1
-
-    diff=0
-    for i in range(0,len(max_ar)-1) :
-	diff = abs(max_ar[i+1] - max_ar[i])
-	
-	if diff != 1:
-	    steps = steps +1
-
-    print 'NEW!! steps = ',steps
+    compute_steps(dev2)
 
 
 
