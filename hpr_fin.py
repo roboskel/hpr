@@ -49,6 +49,7 @@ total_cluster_time = 0
 hogs_temp=[]
 scan_parts = 5
 step_parts = 6
+trace_array=[]
 
 annotated_humans = 0
 annotated_obstacles = 0
@@ -242,6 +243,7 @@ def online_test(laser_data):
     global mybuffer2, num_c
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
     global tot_results, metrics
+    global trace_array
 
 
     millis_start = int(round(time.time() * 1000))
@@ -454,6 +456,7 @@ def clustering_procedure(clear_data, num_c):
     vcl=[] #Valid Cluster Labels 
     valid_flag=0 #this flag is only set if we have at least one valid cluster
     grids=[]
+    cls = []
 
     Eps, cluster_labels= mt.dbscan(clear_data,3) # DB SCAN
 
@@ -495,6 +498,9 @@ def clustering_procedure(clear_data, num_c):
 	
 	    #print 'x = {} \n align_x = {}'.format(xk, alignment_result[0])
 	    steps2(xk,yk,zk)
+	    #steps3(xk,yk,zk)
+
+	    
 	    '''
 	    points = []
 	    points.append([xk[0],yk[0]])
@@ -518,11 +524,12 @@ def clustering_procedure(clear_data, num_c):
 	    plt.plot(hull_pts[:, 0], hull_pts[:, 1], 'ro', alpha=.25, markersize=20)
 	    plt.show()
 	    '''
+	    cls.append([xk,yk,zk])
 	    
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
-	    #steps2(alignment_result[0], alignment_result[1], alignment_result[2])
+	    steps3(alignment_result[0], alignment_result[1], alignment_result[2])
 
 	    vcl.append(k)
             colors.append(ccnames[k%12])
@@ -538,13 +545,111 @@ def clustering_procedure(clear_data, num_c):
             hogs.append(f)  #extract hog features
 
 	    
-    
+    trace_results = trace(cls)
     fig1.show()
     #fig4.show()
 
 
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
+    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_results)
 
+
+#choice parameter declares the first (True) or the last (False) part of cluster
+def get_centroid(cluster, choice):
+
+    #print 'general cluatser = {}'.format(cluster)
+    if choice == True:
+        z_filter = np.where(cluster[2]==cluster[2][len(cluster[2])-1])
+    else:
+	z_filter = np.where(cluster[2]==cluster[2][0])
+
+    #print 'cl x = {} y = {}'.format(cluster[0][z_filter], cluster[1][z_filter])
+    mean_x = np.mean(cluster[0][z_filter])
+    mean_y = np.mean(cluster[1][z_filter])
+
+    return np.array((mean_x, mean_y))
+
+
+def trace(cls):
+    global trace_array
+    error = 100
+    min_dist = -1.0
+    index = 0
+    list_dist = []
+    temp_list = []
+    flag = True
+
+    print 'TRACE PROCEDURE:'
+
+    if len(trace_array) == 0:
+	for i in range(0, len(cls)):
+	    trace_array.append(get_centroid(cls[i], False))
+	return []
+	 
+    else:
+	if len(cls) >= len(trace_array):
+	    first = trace_array
+	    second = cls
+	    flag = True
+	else:
+	    first = cls
+	    second = trace_array
+	    flag = False	
+
+    	for i in range(0, len(first)):
+	    if flag == False:
+    	    	coord = get_centroid(first[i], True)
+
+	    for j in range(0, len(second)):
+	    #eucl_dist for every combination
+		if flag:
+		    coord = get_centroid(second[j], True)
+	    	    d = dist.euclidean(coord,first[i])
+	    	    temp_list.append(d)
+		else:
+	    	    d = dist.euclidean(coord,second[j])
+	    	    temp_list.append(d)
+	    
+	    list_dist.append(temp_list)
+	    
+	    temp_list = []	    
+	    
+	min_val = -1.0
+	row = 0
+	num = 0
+	col = -1
+	results = []
+	temp_list = list_dist
+	length = len(list_dist)
+
+
+	while num<length:
+	    for i in range(0, len(temp_list)):
+	    	if min_val == -1.0:
+		    min_val = min(temp_list[i])
+		    row = i
+	    	else:
+		    if min_val > min(temp_list[i]):
+		    	min_val = min(temp_list[i])
+		    	row = i
+	    
+	    results.append([num, list_dist[row].index(min_val)])
+	    del temp_list[row]
+	
+
+	    num = num + 1
+	    col = -1
+	    row =0
+	    min_val = -1.0
+	
+
+	print 'Trace results = {}'.format(results)
+
+	#remove previous and add the new ones
+	del trace_array[:]
+	for i in range(0, len(cls)):
+	    trace_array.append(get_centroid(cls[i], False))
+
+	return results
 
 
 def get_accuracy(ann, results):
@@ -717,16 +822,79 @@ def diff_error2(value, m):
     return True
 
 
-# separate data in equal parts of points.
-# compute the standard deviation by median and not the avg of points
-def steps2(x, y, z):
+def steps3(x, y, z):
 
-    global scan_parts, step_parts
+    global scan_parts, step_parts,fig4,ax3
 
     num = 0
     split = len(x)/step_parts
     dev2 = []
     flag = False
+
+    arr = np.array(x)
+    newx = arr.argsort()[:len(x)]
+
+    print 'STEPS 3'
+    newy = []
+    newz = []
+    c=0
+
+    for i in range(0, len(newx)):
+	newy.append(y[newx[i]])
+	newz.append(z[newx[i]])
+
+    
+    while num <= len(x) :
+	if flag == True:
+		break
+
+	xn = newx[num:num+split]
+	yn = newy[num:num+split]
+	zn = newz[num:num+split]
+	
+	if len(xn) != 0 and len(yn)!=0 and len(zn)!=0 :
+		xmean = np.median(np.array(xn))
+		ymean = np.median(np.array(yn))
+		zmean = np.median(np.array(zn))
+
+	
+		sumx = 0.0
+
+		for m in range(0,len(xn)):
+	    		sumx = sumx +  pow((yn[m] - ymean), 2) + pow((zn[m] - zmean), 2) #pow((xn[m] - xmean), 2) +
+
+		dev2.append(round((math.sqrt(sumx/len(xn))),2))
+	num = num + split
+
+	c=c+1
+
+	ax3.scatter(xn,yn, zn, 'z', 30, cc[c%12]) 
+	fig4.add_axes(ax3)
+	fig4.show()
+
+	
+	if len(x)-num < split :
+	    	split = len(x)-num
+		flag = True
+	
+
+    print 'deviation = {}'.format(dev2)
+    #steps_from_deviation(dev2)
+    compute_steps(dev2)
+    
+
+
+# separate data in equal parts of points.
+# compute the standard deviation by median and not the avg of points
+def steps2(x, y, z):
+
+    global scan_parts, step_parts, fig4, ax3
+
+    num = 0
+    split = len(x)/step_parts
+    dev2 = []
+    flag = False
+    c=0
 
     while num <= len(x) :
 	if flag == True:
@@ -917,7 +1085,7 @@ def speed(x, y, z) :
     print ' SPEED = ',scan_speed
 
 
-def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
+def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_results):
     
     global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4,kat
     global annotations, first_time, all_annotations,annotated_humans,annotated_obstacles
