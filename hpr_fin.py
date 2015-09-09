@@ -22,8 +22,8 @@ from scipy import interpolate
 from sklearn.decomposition import PCA
 from scipy.spatial import ConvexHull
 
-ccnames =['gray', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'red', 'green', 'brown', 'yellow', 'gold']
-cc  =  ['#808080',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','r','g','#8B4513','y','#FFD700']
+ccnames =['red', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'gray','green', 'brown', 'yellow', 'gold']
+cc  =  ['r',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','#808080', 'g','#8B4513','y','#FFD700']
 wall_flag=0
 fr_index=1
 z=0
@@ -50,6 +50,7 @@ hogs_temp=[]
 scan_parts = 5
 step_parts = 6
 trace_array=[]
+trace_count = 0
 
 annotated_humans = 0
 annotated_obstacles = 0
@@ -571,6 +572,7 @@ def get_centroid(cluster, choice):
 
 def trace(cls):
     global trace_array
+    global trace_count
     error = 100
     min_dist = -1.0
     index = 0
@@ -583,10 +585,11 @@ def trace(cls):
     if len(trace_array) == 0:
 	for i in range(0, len(cls)):
 	    trace_array.append(get_centroid(cls[i], False))
-	return []
+	trace_count = len(cls)
+	return [11]
 	 
     else:
-	if len(cls) >= len(trace_array):
+	if len(cls) > len(trace_array):
 	    first = trace_array
 	    second = cls
 	    flag = True
@@ -601,12 +604,16 @@ def trace(cls):
 
 	    for j in range(0, len(second)):
 	    #eucl_dist for every combination
+		#print '2nd for: i = ', i , ' j = ',j
+
 		if flag:
 		    coord = get_centroid(second[j], True)
 	    	    d = dist.euclidean(coord,first[i])
+		    #print 'for flag==true:	 first[i] = {}	  coord = {}	 d={}'.format(first[i],coord,d)
 	    	    temp_list.append(d)
 		else:
 	    	    d = dist.euclidean(coord,second[j])
+		    #print 'for flag==false: second[j]	  coord = {}	 d={}'.format(second[j],coord,d)
 	    	    temp_list.append(d)
 	    
 	    list_dist.append(temp_list)
@@ -616,39 +623,66 @@ def trace(cls):
 	min_val = -1.0
 	row = 0
 	num = 0
+	temp_num = 0
 	col = -1
 	results = []
-	temp_list = list_dist
+	temp_list = list(list_dist)
 	length = len(list_dist)
 
+	if flag:
+	    for i in range(0,len(cls)):
+		results.append(11)
 
+	print 'list dist = {}'.format(list_dist)
 	while num<length:
+	    #temp_list = list_dist[num]
 	    for i in range(0, len(temp_list)):
 	    	if min_val == -1.0:
 		    min_val = min(temp_list[i])
-		    row = i
+		    temp_row = i
 	    	else:
 		    if min_val > min(temp_list[i]):
 		    	min_val = min(temp_list[i])
-		    	row = i
+		    	temp_row = i
 	    
-	    results.append([num, list_dist[row].index(min_val)])
-	    del temp_list[row]
-	
+	    for i in range(0, len(list_dist)):
+		if min_val in list_dist[i]:
+		    row = i
+		    break
+
+	    if flag:		
+		#results.insert(list_dist[row].index(min_val),row)
+		results[list_dist[row].index(min_val)] = row
+	    else:
+		#temp_num = trace_count - len(cls)
+		temp_num = 0
+		#print 'normal = {} temp_num = {} trace_count {}'.format(list_dist[row].index(min_val), temp_num, trace_count)
+	    	results.append(list_dist[row].index(min_val) + temp_num)
+	    del temp_list[temp_row]
+
 
 	    num = num + 1
 	    col = -1
 	    row =0
 	    min_val = -1.0
 	
-
+	    
+	    
 	print 'Trace results = {}'.format(results)
 
+	if len(results) < len(cls):
+	    length = len(cls)-len(results)
+	    for i in range(length-1, len(cls)):
+		results.append(11)
+
+	#print 'trace_count ',trace_count, ' len(trace)',len(trace_array)
+	trace_count = len(trace_array)
 	#remove previous and add the new ones
 	del trace_array[:]
 	for i in range(0, len(cls)):
 	    trace_array.append(get_centroid(cls[i], False))
 
+	
 	return results
 
 
@@ -659,7 +693,9 @@ def get_accuracy(ann, results):
     F=0.0
 
     if len(ann) != len(results):
-	print 'ERROR'
+	print 'ERROR: different size in annotations and results.'
+	return
+
 
     for i in range(0, len(ann)):
 	if ann[i]==results[i]:
@@ -1121,6 +1157,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
         cnt=0
 	col_list=[]
 
+
         for k in vcl:
 	    #fig1.clear()
             filter=np.where(cluster_labels==k)
@@ -1134,13 +1171,14 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
 		print 'out of data'
 		continue
 
+	    print '!!! LENGTH trace ',len(trace_results), ' cnt = ',cnt
 	    #print 'xc = {} align_cl[cnt][0] ={}'.format(xc,align_cl[cnt][0])
 
             if results[cnt]==1:
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
-                ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #human
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
+                ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #human
+		#ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
@@ -1148,8 +1186,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
             else:
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
-                ax.scatter(x,y, zed, 'z', 30, cc[k%12]) #object
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
+                ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #object
+		#ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
