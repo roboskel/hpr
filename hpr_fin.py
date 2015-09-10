@@ -52,6 +52,12 @@ step_parts = 6
 trace_array=[]
 trace_count = 0
 
+trace_results=[]
+cls_results=[]
+traced_clusters=[]
+max_cls=0
+first_trace = True
+
 annotated_humans = 0
 annotated_obstacles = 0
 
@@ -502,29 +508,6 @@ def clustering_procedure(clear_data, num_c):
 	    #steps3(xk,yk,zk)
 
 	    
-	    '''
-	    points = []
-	    points.append([xk[0],yk[0]])
-	
-	    for i in range(1,len(xk)) :
-		points.append([xk[i],yk[i]])
-
-	    #print 'PP {}'.format(points)
-	    hull = ConvexHull(points)
-	    
-	    hull_indices = np.unique(hull.simplices.flat)
-	    print 'HULL {}'.format(hull_indices)
-	    hull_pts = []
-	    for j in range(0, len(hull_indices)):
-		index = hull_indices[j]
-	    	hull_pts.append(points[index])
-	    #print 'hull_pts {}'.format(hull_pts)
-	    
-
-	    #plt.plot(points[:, 0], points[:, 1], 'ko', markersize=10)
-	    plt.plot(hull_pts[:, 0], hull_pts[:, 1], 'ro', alpha=.25, markersize=20)
-	    plt.show()
-	    '''
 	    cls.append([xk,yk,zk])
 	    
 	    align_cl.append(alignment_result)
@@ -570,9 +553,54 @@ def get_centroid(cluster, choice):
     return np.array((mean_x, mean_y))
 
 
+def create_trace():
+
+    global trace_results, cls_results
+    global traced_clusters, max_cls
+
+    temp = []
+
+    print 'CREATE TRACE:'
+
+    for j in range(0,max_cls):
+
+	for i in range(0, len(trace_results)):
+	    if j in trace_results[i]:
+		temp.append(cls_results[i][trace_results[i].index(j)])
+
+	traced_clusters.append(temp)
+	temp=[]
+
+    #print 'now traced clusters are: {}'.format(traced_clusters)
+
+def continue_trace():
+
+    global trace_results, cls_results
+    global traced_clusters, max_cls
+
+    last_element = len(trace_results) - 1
+
+    print 'CONTINUE TRACE:'
+
+    for i in range(0, len(trace_results[last_element])):
+	index = trace_results[last_element][i]
+
+	if index != 11:
+	    del traced_clusters[index][0]
+	    traced_clusters[index].append(cls_results[i])
+	else:
+	    traced_clusters.append(cls_results[i])
+
+    print 'now num of traced clusters is: {}'.format(len(traced_clusters))
+
+
 def trace(cls):
     global trace_array
     global trace_count
+
+    global trace_results, cls_results
+    global traced_clusters, first_trace, max_cls
+
     error = 100
     min_dist = -1.0
     index = 0
@@ -629,9 +657,9 @@ def trace(cls):
 	temp_list = list(list_dist)
 	length = len(list_dist)
 
-	if flag:
-	    for i in range(0,len(cls)):
-		results.append(11)
+	#if flag:
+	for i in range(0,len(cls)):
+	    results.append(11)
 
 	print 'list dist = {}'.format(list_dist)
 	while num<length:
@@ -650,15 +678,19 @@ def trace(cls):
 		    row = i
 		    break
 
+
 	    if flag:		
 		#results.insert(list_dist[row].index(min_val),row)
 		results[list_dist[row].index(min_val)] = row
 	    else:
-		#temp_num = trace_count - len(cls)
-		temp_num = 0
-		#print 'normal = {} temp_num = {} trace_count {}'.format(list_dist[row].index(min_val), temp_num, trace_count)
-	    	results.append(list_dist[row].index(min_val) + temp_num)
+	    	results[row] = list_dist[row].index(min_val)
+
+
+	    ind = temp_list[temp_row].index(min_val)
 	    del temp_list[temp_row]
+
+	    for i in range(0, len(temp_list)):
+		temp_list[i][ind] = error
 
 
 	    num = num + 1
@@ -670,10 +702,10 @@ def trace(cls):
 	    
 	print 'Trace results = {}'.format(results)
 
-	if len(results) < len(cls):
-	    length = len(cls)-len(results)
-	    for i in range(length-1, len(cls)):
-		results.append(11)
+	#if len(results) < len(cls):
+	#length = len(cls)-len(results)
+	#for i in range(length-1, len(cls)):
+	#    results.append(11)
 
 	#print 'trace_count ',trace_count, ' len(trace)',len(trace_array)
 	trace_count = len(trace_array)
@@ -683,6 +715,28 @@ def trace(cls):
 	    trace_array.append(get_centroid(cls[i], False))
 
 	
+	trace_results.append(results)
+	print 'trace: results now... {}'.format(trace_results)
+	cls_results.append(cls)
+
+	#the maximum number of clusters
+	if max_cls < len(results):
+	    max_cls = len(results)
+
+	if len(trace_results) == 3:
+	    if first_trace:
+		create_trace()
+		first_trace = False
+		
+	    else:
+		continue_trace()
+		
+	    #display in plot
+		
+	    del trace_results[0]
+	    del cls_results[0]
+	    max_cls = len(traced_clusters)
+
 	return results
 
 
@@ -1171,7 +1225,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
 		print 'out of data'
 		continue
 
-	    print '!!! LENGTH trace ',len(trace_results), ' cnt = ',cnt
+	    #print '!!! LENGTH trace ',len(trace_results), ' cnt = ',cnt
 	    #print 'xc = {} align_cl[cnt][0] ={}'.format(xc,align_cl[cnt][0])
 
             if results[cnt]==1:
