@@ -50,7 +50,7 @@ hogs_temp=[]
 scan_parts = 5
 step_parts = 6
 trace_array=[]
-trace_count = 0
+trace_count = []
 
 trace_results=[]
 cls_results=[]
@@ -474,7 +474,7 @@ def clustering_procedure(clear_data, num_c):
     [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
 
     fig1.clear()
-    fig4.clear()
+    #fig4.clear()
 
     #for every created cluster - its data points
     for k in range(1,max_label+1) :
@@ -567,6 +567,7 @@ def create_trace():
 	for i in range(0, len(trace_results)):
 	    if j in trace_results[i]:
 		temp.append(cls_results[i][trace_results[i].index(j)])
+		#print 'length of added cluster = ',len(cls_results[i][trace_results[i].index(j)][0])
 
 	traced_clusters.append(temp)
 	temp=[]
@@ -580,25 +581,31 @@ def continue_trace():
 
     last_element = len(trace_results) - 1
 
-    print 'CONTINUE TRACE:'
+    print 'CONTINUE TRACE: length of last element ',len(trace_results[last_element])
 
     for i in range(0, len(trace_results[last_element])):
 	index = trace_results[last_element][i]
 
 	if index != 11:
-	    del traced_clusters[index][0]
-	    traced_clusters[index].append(cls_results[i])
-	else:
-	    traced_clusters.append(cls_results[i])
+	    #print 'index != 11 '
+	    if len(traced_clusters[index]) == 4:
+	    	del traced_clusters[index][0]
 
-    print 'now num of traced clusters is: {}'.format(len(traced_clusters))
+	    traced_clusters[index].append(cls_results[last_element][i])
+	    print 'add cluster length {}'.format(len(cls_results[last_element][i][0]))
+	else:
+	    print 'new cluster to add..'
+	    traced_clusters.append([cls_results[last_element][i]])
+
+    #print 'now num of traced clusters is: {}'.format(len(traced_clusters[0]))
+    #print 'tr_cl[0] {}'.format(traced_clusters[0])
 
 
 def trace(cls):
     global trace_array
     global trace_count
 
-    global trace_results, cls_results
+    global trace_results, cls_results, fig4
     global traced_clusters, first_trace, max_cls
 
     error = 100
@@ -613,7 +620,7 @@ def trace(cls):
     if len(trace_array) == 0:
 	for i in range(0, len(cls)):
 	    trace_array.append(get_centroid(cls[i], False))
-	trace_count = len(cls)
+	    trace_count.append(i)
 	return [11]
 	 
     else:
@@ -682,6 +689,7 @@ def trace(cls):
 	    if flag:		
 		#results.insert(list_dist[row].index(min_val),row)
 		results[list_dist[row].index(min_val)] = row
+		
 	    else:
 	    	results[row] = list_dist[row].index(min_val)
 
@@ -707,8 +715,6 @@ def trace(cls):
 	#for i in range(length-1, len(cls)):
 	#    results.append(11)
 
-	#print 'trace_count ',trace_count, ' len(trace)',len(trace_array)
-	trace_count = len(trace_array)
 	#remove previous and add the new ones
 	del trace_array[:]
 	for i in range(0, len(cls)):
@@ -719,11 +725,17 @@ def trace(cls):
 	print 'trace: results now... {}'.format(trace_results)
 	cls_results.append(cls)
 
+	# a cluster disappears
+	#if len(cls) < len(trace_array):
+	    #remove the unnecessary clusters
+
 	#the maximum number of clusters
 	if max_cls < len(results):
 	    max_cls = len(results)
 
-	if len(trace_results) == 3:
+	if len(trace_results) == 4:
+	    fig4.clear()
+
 	    if first_trace:
 		create_trace()
 		first_trace = False
@@ -733,11 +745,55 @@ def trace(cls):
 		
 	    #display in plot
 		
+	    fig4.show()
+	    plot_trace()
+	    #fig4.show()
+
 	    del trace_results[0]
 	    del cls_results[0]
 	    max_cls = len(traced_clusters)
 
 	return results
+
+def plot_trace():
+
+    global traced_clusters,fig4,ax3
+    x=[]
+    y=[]
+    z=[]
+
+    for i in range(0, len(traced_clusters)):
+	#print 'CL {}'.format(traced_clusters[i][0][0])
+	x.append(traced_clusters[i][0][0])
+	y.append(traced_clusters[i][0][1])
+	z.append(traced_clusters[i][0][2])
+
+	xar = np.array(traced_clusters[i][0][0])
+	yar = np.array(traced_clusters[i][0][1])
+	zar = np.array(traced_clusters[i][0][2])
+
+	print 'plot trace: len of cl ',len(traced_clusters[i])
+
+	if len(traced_clusters[i]) > 1:
+	    for j in range(1, len(traced_clusters[i])):
+		#print '! traced to add = ',format(traced_clusters[i][j][0])
+		xar = np.append(xar,traced_clusters[i][j][0])
+		yar = np.append(yar,traced_clusters[i][j][1])
+		#zar = np.append(zar,traced_clusters[i][j][2])
+		B = traced_clusters[i][j][2].copy()
+
+		B[::1]  += zar[len(zar) - 1]
+		#print 'B = {}'.format(B)
+		#print 'last element {}'.format(zar[len(zar) - 1])
+		zar =  np.append(zar,B)
+
+	print 'len x = {} len y ={} len z = {}'.format(len(xar), len(yar), len(zar))
+	#[x,y,z] = [traced_clusters[i][0][:,0], traced_clusters[i][0][:,1], traced_clusters[i][0][:,2]]
+
+	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
+        fig4.add_axes(ax3)
+
+	plt.pause(0.0001)
 
 
 def get_accuracy(ann, results):
@@ -958,9 +1014,9 @@ def steps3(x, y, z):
 
 	c=c+1
 
-	ax3.scatter(xn,yn, zn, 'z', 30, cc[c%12]) 
-	fig4.add_axes(ax3)
-	fig4.show()
+	#ax3.scatter(xn,yn, zn, 'z', 30, cc[c%12]) 
+	#fig4.add_axes(ax3)
+	#fig4.show()
 
 	
 	if len(x)-num < split :
@@ -1050,9 +1106,9 @@ def steps(x, y, z):
 	else:
 	    
     	    if len(xk) !=0 and len(yk) !=0:
-		ax3.scatter(xk,yk, zk, 'z', 30, cc[c%12]) 
-		fig4.add_axes(ax3)
-		fig4.show()
+		#ax3.scatter(xk,yk, zk, 'z', 30, cc[c%12]) 
+		#fig4.add_axes(ax3)
+		#fig4.show()
 		arr = np.array([xk,yk,zk])
 		#print 'standard dev = {}'.format(np.std(arr))
 		
@@ -1173,6 +1229,8 @@ def speed(x, y, z) :
     scan_speed = d/(z_angle - z[0])
 
     print ' SPEED = ',scan_speed
+
+
 
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_results):
