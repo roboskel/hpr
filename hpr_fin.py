@@ -48,15 +48,17 @@ sub_topic = 'scan'
 total_cluster_time = 0
 hogs_temp=[]
 scan_parts = 5
-step_parts = 6
+step_parts = 10
 trace_array=[]
-trace_count = []
+trace_count = False
 
 trace_results=[]
 cls_results=[]
 traced_clusters=[]
 max_cls=0
 first_trace = True
+track_parts = 4
+step_counter = 0
 
 annotated_humans = 0
 annotated_obstacles = 0
@@ -487,7 +489,7 @@ def clustering_procedure(clear_data, num_c):
 	    #points of every cluster at each timewindow-frame
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
 
-	    speed(xk,yk,zk)
+	    #speed(xk,yk,zk)
 	    trans_matrix =[[xk,yk,zk]]
 	    all_clusters.append([xk,yk,zk])
 
@@ -513,7 +515,7 @@ def clustering_procedure(clear_data, num_c):
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
 
-	    steps3(alignment_result[0], alignment_result[1], alignment_result[2])
+	    #steps3(alignment_result[0], alignment_result[1], alignment_result[2])
 
 	    vcl.append(k)
             colors.append(ccnames[k%12])
@@ -529,12 +531,12 @@ def clustering_procedure(clear_data, num_c):
             hogs.append(f)  #extract hog features
 
 	    
-    trace_results = trace(cls)
+    trace(cls)
     fig1.show()
     #fig4.show()
 
 
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_results)
+    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
 
 
 #choice parameter declares the first (True) or the last (False) part of cluster
@@ -559,12 +561,16 @@ def create_trace():
     global traced_clusters, max_cls
 
     temp = []
+    counter = 1
 
     print 'CREATE TRACE:'
 
     for j in range(0,max_cls):
 
 	for i in range(0, len(trace_results)):
+	    if len(trace_results[i]) > counter:
+		counter = counter +1
+		temp.append(cls_results[i][trace_results[i].index(11)])
 	    if j in trace_results[i]:
 		temp.append(cls_results[i][trace_results[i].index(j)])
 		#print 'length of added cluster = ',len(cls_results[i][trace_results[i].index(j)][0])
@@ -576,7 +582,7 @@ def create_trace():
 
 def continue_trace():
 
-    global trace_results, cls_results
+    global trace_results, cls_results, trace_count
     global traced_clusters, max_cls
 
     last_element = len(trace_results) - 1
@@ -586,27 +592,31 @@ def continue_trace():
     for i in range(0, len(trace_results[last_element])):
 	index = trace_results[last_element][i]
 
-	if index != 11:
+	if index != -1:
 	    #print 'index != 11 '
 	    if len(traced_clusters[index]) == 4:
 	    	del traced_clusters[index][0]
 
 	    traced_clusters[index].append(cls_results[last_element][i])
-	    print 'add cluster length {}'.format(len(cls_results[last_element][i][0]))
 	else:
-	    print 'new cluster to add..'
 	    traced_clusters.append([cls_results[last_element][i]])
 
+    '''
+    if len(traced_clusters) > len(trace_results[last_element]) :
+	for i in range(len(traced_clusters)-len(trace_results[last_element])+1 , len(traced_clusters)):
+	    del traced_clusters[i]
+    '''
     #print 'now num of traced clusters is: {}'.format(len(traced_clusters[0]))
-    #print 'tr_cl[0] {}'.format(traced_clusters[0])
 
 
 def trace(cls):
     global trace_array
-    global trace_count
+    global trace_count, track_parts
 
     global trace_results, cls_results, fig4
     global traced_clusters, first_trace, max_cls
+
+    global step_counter
 
     error = 100
     min_dist = -1.0
@@ -620,10 +630,18 @@ def trace(cls):
     if len(trace_array) == 0:
 	for i in range(0, len(cls)):
 	    trace_array.append(get_centroid(cls[i], False))
-	    trace_count.append(i)
-	return [11]
+	    trace_results.append([i])
+	    cls_results.append([cls[i]])
 	 
     else:
+	#condition where the clusters have been reduced
+	if trace_count:
+	    traced_clusters2 = [x for x in traced_clusters if x != []]
+	    traced_clusters = list(traced_clusters2)
+
+	    trace_count = False
+
+
 	if len(cls) > len(trace_array):
 	    first = trace_array
 	    second = cls
@@ -666,7 +684,7 @@ def trace(cls):
 
 	#if flag:
 	for i in range(0,len(cls)):
-	    results.append(11)
+	    results.append(-1)
 
 	print 'list dist = {}'.format(list_dist)
 	while num<length:
@@ -710,6 +728,21 @@ def trace(cls):
 	    
 	print 'Trace results = {}'.format(results)
 
+	
+	
+	
+	# a cluster disappears
+	if len(results) < len(trace_array):
+	    rm_list = []
+	    #remove the unnecessary clusters
+	    for j in range(0, len(trace_array)):
+		if j not in results:
+		    rm_list.append(j)
+	    for i in range(0, len(rm_list)):
+	    	del traced_clusters[rm_list[i]][:]
+		trace_count = True
+
+
 	#if len(results) < len(cls):
 	#length = len(cls)-len(results)
 	#for i in range(length-1, len(cls)):
@@ -722,26 +755,28 @@ def trace(cls):
 
 	
 	trace_results.append(results)
-	print 'trace: results now... {}'.format(trace_results)
 	cls_results.append(cls)
 
-	# a cluster disappears
-	#if len(cls) < len(trace_array):
-	    #remove the unnecessary clusters
-
+	
 	#the maximum number of clusters
 	if max_cls < len(results):
 	    max_cls = len(results)
 
-	if len(trace_results) == 4:
+	if len(trace_results) == track_parts:
 	    fig4.clear()
 
 	    if first_trace:
 		create_trace()
 		first_trace = False
+		step_processing()
 		
 	    else:
 		continue_trace()
+		step_counter  = step_counter + 1
+
+	    if step_counter == track_parts:
+		step_processing()
+		step_counter = 0
 		
 	    #display in plot
 		
@@ -751,32 +786,26 @@ def trace(cls):
 
 	    del trace_results[0]
 	    del cls_results[0]
-	    max_cls = len(traced_clusters)
+	    max_cls = len(results)
 
-	return results
 
 def plot_trace():
 
     global traced_clusters,fig4,ax3
-    x=[]
-    y=[]
-    z=[]
+
+    print 'PLOT TRACE '
 
     for i in range(0, len(traced_clusters)):
-	#print 'CL {}'.format(traced_clusters[i][0][0])
-	x.append(traced_clusters[i][0][0])
-	y.append(traced_clusters[i][0][1])
-	z.append(traced_clusters[i][0][2])
+	if len(traced_clusters[i]) == 0:
+	    continue
 
 	xar = np.array(traced_clusters[i][0][0])
 	yar = np.array(traced_clusters[i][0][1])
 	zar = np.array(traced_clusters[i][0][2])
 
-	print 'plot trace: len of cl ',len(traced_clusters[i])
 
 	if len(traced_clusters[i]) > 1:
 	    for j in range(1, len(traced_clusters[i])):
-		#print '! traced to add = ',format(traced_clusters[i][j][0])
 		xar = np.append(xar,traced_clusters[i][j][0])
 		yar = np.append(yar,traced_clusters[i][j][1])
 		#zar = np.append(zar,traced_clusters[i][j][2])
@@ -787,13 +816,37 @@ def plot_trace():
 		#print 'last element {}'.format(zar[len(zar) - 1])
 		zar =  np.append(zar,B)
 
-	print 'len x = {} len y ={} len z = {}'.format(len(xar), len(yar), len(zar))
 	#[x,y,z] = [traced_clusters[i][0][:,0], traced_clusters[i][0][:,1], traced_clusters[i][0][:,2]]
 
 	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
         fig4.add_axes(ax3)
 
 	plt.pause(0.0001)
+
+
+def step_processing():
+
+    global traced_clusters
+
+    for i in range(0, len(traced_clusters)):
+	if len(traced_clusters[i]) == 0:
+	    continue
+
+	xar = np.array(traced_clusters[i][0][0])
+	yar = np.array(traced_clusters[i][0][1])
+	zar = np.array(traced_clusters[i][0][2])
+
+
+	if len(traced_clusters[i]) > 1:
+	    for j in range(1, len(traced_clusters[i])):
+		xar = np.append(xar,traced_clusters[i][j][0])
+		yar = np.append(yar,traced_clusters[i][j][1])
+		B = traced_clusters[i][j][2].copy()
+
+		B[::1]  += zar[len(zar) - 1]
+		zar =  np.append(zar,B)
+
+    	steps2(xar, yar, zar)
 
 
 def get_accuracy(ann, results):
@@ -1233,7 +1286,7 @@ def speed(x, y, z) :
 
 
 
-def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_results):
+def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
     
     global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4,kat
     global annotations, first_time, all_annotations,annotated_humans,annotated_obstacles
@@ -1289,8 +1342,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
             if results[cnt]==1:
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
-                ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #human
-		#ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
+                #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #human
+		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
@@ -1298,8 +1351,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids, trace_r
             else:
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
-                ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #object
-		#ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
+                #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #object
+		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
