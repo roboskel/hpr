@@ -15,7 +15,7 @@ import time
 from os import listdir
 from os.path import isfile, join, splitext
 #from myhog import hog
-from skimage.feature import hog
+from my_skimage.feature import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 from scipy import interpolate
