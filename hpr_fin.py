@@ -62,6 +62,9 @@ step_counter = 0
 
 annotated_humans = 0
 annotated_obstacles = 0
+basic_counter = 0
+tot_speed = []
+tot_steps = []
 
 #temp2 = np.zeros((1, 36))
 
@@ -149,7 +152,7 @@ def laser_listener():
                 except SyntaxError:
                     print 'Try again'
         print "Classifier File : {0}".format(class_path)
-        
+        '''
         if not os.path.isfile(pca_path):
             while True :
                 try:
@@ -160,6 +163,8 @@ def laser_listener():
                         print 'File does not exist! Try again!'
                 except SyntaxError:
                     print 'Try again'
+	'''
+	
         print "File : {0}".format(pca_path)
 
         rospy.init_node('laser_listener', anonymous=True)
@@ -363,7 +368,7 @@ def loadfiles():
     
 
     classifier = pickle.load( open( class_path, "rb" ) )
-    pca_obj = pickle.load(open ( pca_path, "rb"))
+    #pca_obj = pickle.load(open ( pca_path, "rb"))
     #all_annotations = pickle.load(open("cluster_labels/video5annotations.p","rb"))
     mat=sio.loadmat("cluster_labels/video5_labels.mat")
     #all_annotations=mat['annotations'][0]
@@ -489,7 +494,7 @@ def clustering_procedure(clear_data, num_c):
 	    #points of every cluster at each timewindow-frame
 	    [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
 
-	    #speed(xk,yk,zk)
+	    speed(xk,yk,zk)
 	    trans_matrix =[[xk,yk,zk]]
 	    all_clusters.append([xk,yk,zk])
 
@@ -791,7 +796,7 @@ def trace(cls):
 
 def plot_trace():
 
-    global traced_clusters,fig4,ax3
+    global traced_clusters,fig4,ax3, basic_counter, pca_path
 
     print 'PLOT TRACE '
 
@@ -821,6 +826,7 @@ def plot_trace():
 	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
         fig4.add_axes(ax3)
 
+	fig4.savefig(pca_path+'tracedCl_'+str(basic_counter), format='png')
 	plt.pause(0.0001)
 
 
@@ -873,6 +879,8 @@ def get_accuracy(ann, results):
 #gets the local minimums and maximums of the st.deviation matrix
 #tries to compute the number of the steps with the use of this information
 def compute_steps(dev) :
+
+    global tot_steps
 
     min_array = []
     max_array = []
@@ -998,7 +1006,7 @@ def compute_steps(dev) :
 		steps = steps + len(first) -1
 
     print 'Compute steps :  ',steps
-
+    tot_steps.append(steps)
 
 
 
@@ -1232,7 +1240,7 @@ def steps(x, y, z):
 
 def speed(x, y, z) :
 
-    global z_scale, scan_parts
+    global z_scale, scan_parts, tot_speed
 
     z_angle = z[0]
     dist = 0.0
@@ -1282,7 +1290,7 @@ def speed(x, y, z) :
     scan_speed = d/(z_angle - z[0])
 
     print ' SPEED = ',scan_speed
-
+    tot_speed.append(scan_speed)
 
 
 
@@ -1343,7 +1351,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
                 #classification_array.append(1)
                 kat.scatter(x,y,s=20, c='r')
                 #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #human
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #human
+		ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #human
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
@@ -1352,7 +1360,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
                 #classification_array.append(0)
                 kat.scatter(x,y,s=20, c='b')
                 #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #object
-		ax.scatter(xc,yc, zc, 'z', 30, cc[k+1%12]) #obj
+		ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #obj
                 fig1.add_axes(ax)
 
 		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
@@ -1380,6 +1388,9 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
                 		all_annotations=np.hstack((all_annotations,np.array(ha)))
 				
 
+	store_info(results)
+
+
 
 	pickle.dump(store_results, open('stored_predictions.p','a'))
 	file_name=open('stored_predictions.txt','a')
@@ -1405,7 +1416,34 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
 	
 
 	hogs_temp = np.array(np.array(temp))
-        
+  
+      
+def store_info(results):
+
+    global basic_counter, fig1, pca_path, tot_steps, tot_speed
+
+    fig1.savefig(pca_path+'cluster_'+str(basic_counter), format='png')
+
+    file_name=open('general_info.txt','a')
+    file_name.write("id: "+str(basic_counter))
+    file_name.write(" results: "+str(results))
+    file_name.write(" steps: "+str(tot_steps))
+    file_name.write(" speeds: "+str(tot_speed))
+    file_name.write("\n")
+    file_name.close()
+
+
+    b={}
+    b['id']=basic_counter
+    b['results']=results
+    b['steps']=tot_steps
+    b['speeds']=tot_speed
+
+    sio.savemat('general_info.mat',b);
+    
+    basic_counter = basic_counter +1
+    del tot_steps[:]
+    del tot_speed[:]
 
 
 if __name__ == '__main__':
