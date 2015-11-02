@@ -22,6 +22,13 @@ from scipy.stats.mstats import zscore
 from scipy import interpolate
 from sklearn.decomposition import PCA
 #from scipy.spatial import ConvexHull
+import curses 
+
+stdscr = curses.initscr()
+curses.cbreak()
+stdscr.keypad(1)
+stdscr.timeout(0);
+
 
 ccnames =['red', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'gray','green', 'brown', 'yellow', 'gold']
 cc  =  ['r',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','#808080', 'g','#8B4513','y','#FFD700']
@@ -60,7 +67,7 @@ max_cls=0
 first_trace = True
 track_parts = 4
 step_counter = 0
-
+pause = False
 annotated_humans = 0
 annotated_obstacles = 0
 basic_counter = 0
@@ -82,6 +89,16 @@ def RepresentsFloat(s):
         return True
     except ValueError:
         return False
+
+def heardEnter():
+    i,o,e = select.select([sys.stdin],[],[],0.0001)
+    for s in i:
+        if s == sys.stdin:
+            input = sys.stdin.readline()
+	    print "test"
+            return True
+    print "test2"
+    return False
 
 '''
 def Calculate_Metrics(annotated_data):
@@ -246,6 +263,10 @@ def laser_listener():
     	get_accuracy(all_annotations,tot_results)
     	save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
     print "D O N E !"
+    curses.nocbreak()
+    stdscr.keypad(0)
+    curses.echo()
+    curses.endwin()
     #Calculate_Metrics(annotated_data)
     #sys.exit()
 
@@ -264,15 +285,39 @@ def online_test(laser_data):
     global trace_results, cls_results
     global traced_clusters, first_trace, max_cls
 
+    global pause
+
+    
+    key = stdscr.getch()
+    #stdscr.addch(0, 0, key)
+    stdscr.refresh()
+    if key == curses.KEY_ENTER or key == 10:
+	print "##############################################################"
+	pause = not pause
+        print '\033[93m '+ str(pause) + ' \033[0m'
+	#pause = not pause
+
+    #THROW AWAY GARBAGE SCANS
+    #j2 = [i for i in laser_data.ranges if i <= 10]
+    #sampling = np.arange(0, len(np.array(j2)),2)
+    j2 = list(laser_data.ranges)
+    for i in range(0, len(j2)):
+	if j2[i]>10:
+		j = i - 1;
+		while  j2[j] > 10:
+			j = j - 1;
+			if j == 0:
+				break;
+		j2[i] = j2[j];
     millis_start = int(round(time.time() * 1000))
     if wall_flag == 0:
         #print "-------------- 1"
         if w_index == 1:
             #print "-------------- 2"
-            sampling = np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
+            sampling = np.arange(0,len(np.array(j2)),2)#apply sampling e.g every 2 steps
 
             #wall data now contains the scan ranges
-            wall = np.array(laser_data.ranges)
+            wall = np.array(j2)
             
             mybuffer = wall
             #get indexes of scans >= range_limit
@@ -283,7 +328,7 @@ def online_test(laser_data):
             
         if w_index<limit: #loop until you have enough scans to set walls
             #print "-------------- 3"
-            wall = np.array(laser_data.ranges)
+            wall = np.array(j2)
             filter = np.where(wall >= range_limit)
             wall[filter] = range_limit
             mybuffer = np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 360)
@@ -308,7 +353,7 @@ def online_test(laser_data):
     else:
         #walls are set, process scans
         #print "-------------- 5"
-        ranges = np.array(laser_data.ranges)[sampling]
+	ranges = np.array(j2)[sampling]
         filter = np.where(ranges < wall) # filter out walls
         ranges = ranges[filter]
         theta = phi[filter]
@@ -316,10 +361,10 @@ def online_test(laser_data):
 
         if metrics == 1:
             if first_time_ranges:
-                ranges_= np.array(laser_data.ranges)[sampling]
+                ranges_= np.array(j2)[sampling]
                 first_time_ranges = False
             else:
-                ranges_ = np.vstack((ranges_, np.array(laser_data.ranges)[sampling]))
+                ranges_ = np.vstack((ranges_, np.array(j2)[sampling]))
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
             #print "-------------- 6"
@@ -473,9 +518,10 @@ def multiply_array(x,y,z, V) :
 
 def clustering_procedure(clear_data, num_c):
 
-    global cc, ccnames, fig1, z, z_scale, fig4
+    global cc, ccnames, fig1, z, z_scale, fig4, fig1
     global all_clusters,all_hogs,all_gridfit,all_orthogonal
     global tot_results, all_annotations, metrics
+    global pause
     
     #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
@@ -494,7 +540,7 @@ def clustering_procedure(clear_data, num_c):
     #[xi,yi,zi]: the array of data points of the specific frame
     [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
 
-    fig1.clear()
+    #fig1.clear()		#asdasdasdasdasdas
     #fig4.clear()
 
     #for every created cluster - its data points
@@ -552,11 +598,14 @@ def clustering_procedure(clear_data, num_c):
 	
     if valid_flag != 0:    
     	trace(cls)
-    	fig1.show()
+	#if not pause:
+	fig1.show()
     #fig4.show()
-
-
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
+    
+    print '\033[93m '+ str(pause) + ' \033[0m'
+    if not pause:
+	fig1.clear()
+    	update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
 
 
 #choice parameter declares the first (True) or the last (False) part of cluster
@@ -784,23 +833,25 @@ def trace(cls):
 	    max_cls = len(results)
 
 	if len(trace_results) == track_parts:
-	    fig4.clear()
+	    if not pause:
+            	fig4.clear()
 
-	    if first_trace:
-		create_trace()
-		first_trace = False
-		step_processing()
+	    	if first_trace:
+			create_trace()
+			first_trace = False
+			step_processing()
 		
-	    else:
-		continue_trace()
-		step_counter  = step_counter + 1
+	    	else:
+			continue_trace()
+			step_counter  = step_counter + 1
 
-	    if step_counter == track_parts:
-		step_processing()
-		step_counter = 0
+	    	if step_counter == track_parts:
+			step_processing()
+			step_counter = 0
 		
 	    #display in plot
-		
+	    
+            #if not pause:	
 	    fig4.show()
 	    plot_trace()
 	    #fig4.show()
@@ -841,8 +892,9 @@ def plot_trace():
 
 	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
         fig4.add_axes(ax3)
-
-	fig4.savefig(pca_path+'tracedCl_'+str(basic_counter), format='png')
+	
+	#UNCOMMENT THE LINE BELOW TO SAVE A SCREENSHOT!
+	#fig4.savefig(pca_path+'tracedCl_'+str(basic_counter), format='png')
 	plt.pause(0.0001)
 
 
@@ -1403,8 +1455,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
             		else:
                 		all_annotations=np.hstack((all_annotations,np.array(ha)))
 				
-
-	store_info(results)
+        #UNCOMMENT TO STORE INFO
+	#store_info(results)
 
 
 
@@ -1437,7 +1489,8 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
 def store_info(results):
 
     global basic_counter, fig1, pca_path, tot_steps, tot_speed
-
+    
+      
     fig1.savefig(pca_path+'cluster_'+str(basic_counter), format='png')
 
     file_name=open('general_info.txt','a')
