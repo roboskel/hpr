@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-__author__="athanasia sapountzi"
 
 import roslib, warnings, rospy, math, pickle, scipy.stats
 from gridfit import gridfit
@@ -19,13 +18,8 @@ from my_skimage.feature import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 from scipy import interpolate
-import curses 
-
-stdscr = curses.initscr()
-curses.cbreak()
-stdscr.keypad(1)
-stdscr.timeout(0);
-
+from human_pattern_recognition.msg import Clusters
+from human_pattern_recognition.msg import cluster
 
 ccnames =['red', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'gray','green', 'brown', 'yellow', 'gold']
 cc  =  ['r',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','#808080', 'g','#8B4513','y','#FFD700']
@@ -37,6 +31,8 @@ speed = 5;#human walking speed in km/h
 z_scale = float(speed*dt) / float(3600)
 w_index = 0 #current laser scan used (wall index)
 limit = 3 #how many laser scans to use in order to create the walls
+
+minmaxlist = []
 
 plt.ion()
 
@@ -61,7 +57,6 @@ max_cls = 0
 first_trace = True
 track_parts = 4
 step_counter = 0
-pause = False
 basic_counter = 0
 tot_speed = []
 tot_steps = []
@@ -106,10 +101,10 @@ def laser_listener():
     tot_results=[]
 
     if not len(sys.argv) == 7:
-        #print "###################################"
-        #print "Run as follows : "
-        #print "python hpr_pausable.py <LDA_classifier_object_path> <folder_to_save_data> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>"
-        #print "###################################"
+        print "###################################"
+        print "Run as follows : "
+        print "python hpr_pausable.py <LDA_classifier_object_path> <folder_to_save_data> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>"
+        print "###################################"
         exit()
     else:
         classifier_path = str(sys.argv[1])
@@ -124,9 +119,9 @@ def laser_listener():
                         print 'File does not exist! Try again!'
                 except SyntaxError:
                     print 'Try again'
-        #print "Classifier File : {0}".format(classifier_path)
+        print "Classifier File : {0}".format(classifier_path)
 	
-        #print "File : {0}".format(save_folder)
+        print "File : {0}".format(save_folder)
 
         rospy.init_node('laser_listener', anonymous=True)
         scan_topic = str(sys.argv[3])
@@ -156,21 +151,21 @@ def laser_listener():
     if metrics == 1:
 	global store_file
 
-	#print 'Please give a filename for storage.'
+	print 'Please give a filename for storage.'
 	filename = raw_input()
 	if filename != '':
 	    store_file = filename
 	else:
-	    #print 'You have to give a valid filename.'
+	    print 'You have to give a valid filename.'
 	    exit()
 
-    #print "Metrics: ",metrics
-    #print "Classifier object path : ", classifier_path 
-    #print "Save folder path : ", save_folder
-    #print "Scan Topic : ", scan_topic
-    #print "Timewindow (frames) : ",timewindow
-    #print "Maximum scan range (meters)", range_limit
-    #print "Waiting for laser scans ..."
+    print "Metrics: ",metrics
+    print "Classifier object path : ", classifier_path 
+    print "Save folder path : ", save_folder
+    print "Scan Topic : ", scan_topic
+    print "Timewindow (frames) : ",timewindow
+    print "Maximum scan range (meters)", range_limit
+    print "Waiting for laser scans ..."
    
  
     rospy.Subscriber(scan_topic,LaserScan,online_test)
@@ -193,16 +188,12 @@ def laser_listener():
             pass
         sio.savemat('classification_results',b);
 
-    #print 'duration in milliseconds = {0}'.format(total_cluster_time)
+    print 'duration in milliseconds = {0}'.format(total_cluster_time)
 
     if metrics == 1:
     	get_accuracy(all_annotations,tot_results)
     	save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
-    #print "D O N E !"
-    curses.nocbreak()
-    stdscr.keypad(0)
-    curses.echo()
-    curses.endwin()
+    print "D O N E !"
 
 
 def online_test(laser_data):
@@ -218,16 +209,9 @@ def online_test(laser_data):
     global trace_results, cls_results
     global traced_clusters, first_trace, max_cls
 
-    global pause
+    global minmaxlist
 
-    
-    key = stdscr.getch()
-    stdscr.refresh()
-    if key == curses.KEY_ENTER or key == 10:
-	#print "##############################################################"
-	pause = not pause
-        print '\033[93m '+ str(pause) + ' \033[0m'
-
+    angles_publisher = rospy.Publisher('human_pattern_recognition/cluster_angles', Clusters, queue_size=10)
     laser_ranges = list(laser_data.ranges)
     for i in range(0, len(laser_ranges)):
 	if laser_ranges[i]>range_limit:
@@ -272,7 +256,7 @@ def online_test(laser_data):
             angle_max=laser_data.angle_max
             intensities=laser_data.intensities
 	    angle_prev=angle_min
-            #print 'walls set...'
+            print 'walls set...'
         
     else:
         #walls are set, process scans
@@ -309,7 +293,21 @@ def online_test(laser_data):
 
 
                 if len(mybuffer>3): #at least 3 points are needed to form a cluster
+		    minmaxlist = []
 		    clustering_procedure(mybuffer, num_c)
+		    message_data = []
+		    cluster_msg = Clusters()
+		    #for xy in range(0, len(minmaxlist), 2):
+		    #	message_data.append(math.atan(minmaxlist[xy+1]/minmaxlist[xy]))
+		    for x in range(0, len(minmaxlist), 4):
+			clust = cluster()
+			clust.start = minmaxlist[x]
+			clust.finish = minmaxlist[x+2]
+			cluster_msg.clusters.append(clust)#we use only x since image is 2D
+		    print cluster_msg 
+		    #angles_publisher.publish(message_data)
+		    angles_publisher.publish(cluster_msg)
+		    #print minmaxlist
  
                 fr_index=0
                 z=- z_scale
@@ -360,8 +358,7 @@ def initialize_plots(wall_cart):
     #projection2d=plt.figure()
     #top_view_figure = projection2d.add_subplot(111)
     #f, ((top_view_figure, ax), (ax3, ax4)) = plt.subplots(2, 2)
-    #top_view_figure = plot_figure.add_subplot(2,2,1)
-    top_view_figure = plot_figure.add_subplot(1,2,1)
+    top_view_figure = plot_figure.add_subplot(2,2,1)
     top_view_figure.set_title("Top view")
     top_view_figure.set_xlabel('Vertical distance')
     top_view_figure.set_ylabel('Robot is here')
@@ -372,8 +369,7 @@ def initialize_plots(wall_cart):
     #3D clusters
     #_3d_figure=plt.figure()
     #ax= _3d_figure.gca(projection='3d')
-    #ax = plot_figure.add_subplot(2,2,2,projection='3d')
-    ax = plot_figure.add_subplot(1,2,2,projection='3d')
+    ax = plot_figure.add_subplot(2,2,2,projection='3d')
     ax.set_title("3D view")
     ax.set_xlabel('X - Distance')
     ax.set_ylabel('Y - Robot')
@@ -382,11 +378,11 @@ def initialize_plots(wall_cart):
     #translate and rotate the 3D cluster
     #trace_3d_figure=plt.figure()
     #ax3= trace_3d_figure.gca(projection='3d')
-    #ax3 = plot_figure.add_subplot(2,2,3,projection='3d')
-    #ax3.set_title("Aligned 3D clusters")
-    #ax3.set_xlabel('X - Distance')
-    #ax3.set_ylabel('Y - Robot')
-    #ax3.set_zlabel('Z - Time')
+    ax3 = plot_figure.add_subplot(2,2,3,projection='3d')
+    ax3.set_title("Aligned 3D clusters")
+    ax3.set_xlabel('X - Distance')
+    ax3.set_ylabel('Y - Robot')
+    ax3.set_zlabel('Z - Time')
   
 
     plt.show()
@@ -446,8 +442,8 @@ def clustering_procedure(clear_data, num_c):
     global cc, ccnames, z, z_scale, _3d_figure
     global all_clusters,all_hogs,all_gridfit,all_orthogonal
     global tot_results, all_annotations, metrics
-    global pause
-    
+    global minmaxlist
+  
     hogs=[]
     colors=[]
     align_cl=[]	#contains the aligned data clouds of each cluster
@@ -476,20 +472,29 @@ def clustering_procedure(clear_data, num_c):
 	    speed(xk,yk,zk)
 	    trans_matrix =[[xk,yk,zk]]
 	    all_clusters.append([xk,yk,zk])
+	    xklist = xk.tolist()
+	    #print xklist
+	    minindex = xklist.index(min(xklist))
+	    maxindex = xklist.index(max(xklist))
+	    minmaxlist.append(xk[minindex])
+	    minmaxlist.append(yk[minindex])
+	    minmaxlist.append(xk[maxindex])
+	    minmaxlist.append(yk[maxindex])
+	    
 
 
 	    #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimention.
 	    U,s,V=np.linalg.svd(np.cov([xk,yk,zk]), full_matrices=False)
-	    ##print 'U = {} s = {} V={}'.format(U,s,V)
+	    #print 'U = {} s = {} V={}'.format(U,s,V)
 
 	    #translate each cluster to the begining of the axis and then do the rotation
 	    [xnew,ynew,znew]=translate_cluster(xk,yk,zk)
 
 	    #(traslation matrix) x (rotation matrix) = alignemt of cluster
-	    alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
+	    #alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	
-	    #steps2(xk,yk,zk)
+	    steps2(xk,yk,zk)
 
 	    
 	    cls.append([xk,yk,zk])
@@ -517,10 +522,8 @@ def clustering_procedure(clear_data, num_c):
 
 	#3d_figure.show()
     
-    print '\033[93m '+ str(pause) + ' \033[0m'
-    if not pause:
 	#_3d_figure.clear()
-	ax.clear()
+   	ax.clear()
 	ax.set_title("3D view")
     	ax.set_xlabel('X - Distance')
     	ax.set_ylabel('Y - Robot')
@@ -724,13 +727,12 @@ def trace(cls):
 	    max_cls = len(results)
 
 	if len(trace_results) == track_parts:
-	    if not pause:
-            	#trace_3d_figure.clear()
-		#ax3.clear()
-		#ax3.set_title("Aligned 3D clusters")
-		#ax3.set_xlabel('X - Distance')
-		#ax3.set_ylabel('Y - Robot')
-		#ax3.set_zlabel('Z - Time')
+		#trace_3d_figure.clear()
+		ax3.clear()
+		ax3.set_title("Aligned 3D clusters")
+		ax3.set_xlabel('X - Distance')
+		ax3.set_ylabel('Y - Robot')
+		ax3.set_zlabel('Z - Time')
 
 
 	    	if first_trace:
@@ -746,14 +748,13 @@ def trace(cls):
 			step_processing()
 			step_counter = 0
 		
-            #display in plot
-            #trace_3d_figure.show()
-            plot_trace()
+        	#display in plot
+	        #trace_3d_figure.show()
+            	plot_trace()
 
-            del trace_results[0]
-            del cls_results[0]
-            max_cls = len(results)
-
+		del trace_results[0]
+		del cls_results[0]
+		len(results)
 
 def plot_trace():
 
@@ -779,7 +780,7 @@ def plot_trace():
 		B[::1]  += zar[len(zar) - 1]
 		zar =  np.append(zar,B)
 
-	#ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
+	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
         #trace_3d_figure.add_axes(ax3)
 	
 	#UNCOMMENT THE LINE BELOW TO SAVE A SCREENSHOT!
@@ -819,7 +820,7 @@ def get_accuracy(ann, results):
     F=0.0
 
     if len(ann) != len(results):
-	#print 'ERROR: different size in annotations and results.'
+	print 'ERROR: different size in annotations and results.'
 	return
 
 
@@ -1281,7 +1282,7 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
 
 
 	    if len(xc)==0:
-		#print 'out of data'
+		print 'out of data'
 		continue
 
 
