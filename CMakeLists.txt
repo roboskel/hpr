@@ -12,12 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
-add_message_files(
-  FILES
-  cluster.msg
-  Clusters.msg
-)
-
 find_package(OpenCV)
 
 generate_messages(

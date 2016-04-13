@@ -12,62 +12,63 @@ import mytools as mt #DBSCAN function and perquisites are stored here
 import sys
 import os.path
 import time
-import my_skimage
+import my_skimage #skimage library has been slightly customized (_hog.py)
 from os import listdir
 from os.path import isfile, join, splitext
-#from myhog import hog
 from my_skimage.feature import hog
 from sensor_msgs.msg import LaserScan
 from scipy.stats.mstats import zscore
 from scipy import interpolate
-from sklearn.decomposition import PCA
-#from scipy.spatial import ConvexHull
+import curses 
+
+#stdscr = curses.initscr()
+#curses.cbreak()
+#stdscr.keypad(1)
+#stdscr.timeout(0);
+stdscr = None
+
 
 ccnames =['red', 'black', 'violet', 'blue', 'cyan', 'rosy', 'orange', 'gray','green', 'brown', 'yellow', 'gold']
 cc  =  ['r',  'k',  '#990099', '#0000FF', 'c','#FF9999','#FF6600','#808080', 'g','#8B4513','y','#FFD700']
-wall_flag=0
-fr_index=1
-z=0
+wall_flag = 0
+fr_index = 1
+z = 0
 dt = 25;#period in ms (dt between scans)
 speed = 5;#human walking speed in km/h
-z_scale= float(speed*dt) / float(3600)
-w_index=1
-limit=3
-scan_active = True
-classification_array = []
-scan_received = 0
+z_scale = float(speed*dt) / float(3600)
+w_index = 0 #current laser scan used (wall index)
+limit = 3 #how many laser scans to use in order to create the walls
+
 plt.ion()
-class_path = ''
-pca_path = ''
-pca_obj = PCA()
-annotation_file = ''
-first_time = True
+
+classifier_path = ''
+save_folder = ''
+pause_function = False
+first_time_annotations = True
 first_time_ranges = True
-f_time=True
-sub_topic = 'scan'
-#metrics=0
+first_time_results = True
+
 total_cluster_time = 0
-hogs_temp=[]
+hogs_temp = []
 scan_parts = 5
 step_parts = 10
-trace_array=[]
+trace_array = []
 trace_count = False
 
-trace_results=[]
-cls_results=[]
-traced_clusters=[]
-max_cls=0
+num_of_diagrams = 0
+
+trace_results = []
+cls_results = []
+traced_clusters = []
+max_cls = 0
 first_trace = True
 track_parts = 4
 step_counter = 0
-
-annotated_humans = 0
-annotated_obstacles = 0
+pause = False
 basic_counter = 0
 tot_speed = []
 tot_steps = []
-
-#temp2 = np.zeros((1, 36))
+plot_figure = None
 
 def RepresentsInt(s):
     try: 
@@ -83,48 +84,22 @@ def RepresentsFloat(s):
     except ValueError:
         return False
 
-'''
-def Calculate_Metrics(annotated_data):
-    global classification_array
-    pos = 1
-    true_pos = 0.0
-    true_neg = 0.0
-    false_pos = 0.0
-    false_neg = 0.0
-    neg = 0
-    #print len(annotated_data)
-    classification_array = np.array(classification_array)
-    #print len(classification_array)
-    for i in range(len(classification_array)):
-        if annotated_data[i]==1:
-            if classification_array[i]==1:
-                true_pos += 1.0
-            else:
-                false_neg += 1.0
-        else:
-            if classification_array[i]==1:
-                false_pos += 1.0
-            else:
-                true_neg += 1.0
-    precision = true_pos/(true_pos + false_pos)
-    recall = true_pos/(true_pos + false_neg)
-    accuracy = (true_pos + true_neg)/(true_pos + false_pos + true_neg + false_neg)
-    print "Precision : {0}".format(precision)
-    print "Recall : {0}".format(recall)
-    print "Accuracy : {0}".format(accuracy)
-    input ("Press any key to exit")
-    return
-''' 
+def heardEnter():
+    i,o,e = select.select([sys.stdin],[],[],0.0001)
+    for s in i:
+        if s == sys.stdin:
+            input = sys.stdin.readline()
+            return True
+    return False
 
 
 def laser_listener():
     
-    global class_path, pca_path, sub_topic, timewindow, range_limit
-    global annotations
-    global gaussian, pca_obj
-    global timewindow, range_limit, annotated_data, classification_array
+    global classifier_path, save_folder, timewindow, range_limit
+    global LDA_classifier
+    global timewindow, annotated_data
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
-    global tot_results, metrics
+    global tot_results, metrics, pause_function, stdscr, num_of_diagrams
     
     all_clusters=[]
     all_hogs=[]
@@ -132,69 +107,26 @@ def laser_listener():
     all_orthogonal=[]
     all_annotations=[]
     tot_results=[]
+    
+    classifier_path = rospy.get_param('/human_pattern_recognition/classifier_path', os.path.dirname(os.path.realpath(sys.argv[0]))+'/cluster_labels/LDA_classifier.p')
+    save_folder = rospy.get_param('/human_pattern_recognition/save_path',os.path.dirname(os.path.realpath(sys.argv[0]))+'/cluster_labels/')
+    scan_topic = rospy.get_param('/human_pattern_recognition/scan_topic','scan')
+    timewindow = rospy.get_param('/human_pattern_recognition/timewindow', 40)
+    range_limit = rospy.get_param('/human_pattern_recognition/max_range', 10)
+    metrics = rospy.get_param('/human_pattern_recognition/save_metrics', False)
+    pause_function = rospy.get_param('/human_pattern_recognition/pause_function', False)
+    
+    num_of_diagrams = rospy.get_param('/human_pattern_recognition/num_of_diagrams', 0)
 
-    if not len(sys.argv) == 7:
-        print "###################################"
-        print "For non interactive input run as follows : "
-        print "python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>"
-        print "###################################"
-        exit()
-    else:
-        class_path = str(sys.argv[1])
-        pca_path = str(sys.argv[2])
-        if not os.path.isfile(class_path):
-            while True :
-                try:
-                    class_path=raw_input('Enter classifier object file path: ')
-                    if os.path.isfile(class_path):
-                        break
-                    else:
-                        print 'File does not exist! Try again!'
-                except SyntaxError:
-                    print 'Try again'
-        print "Classifier File : {0}".format(class_path)
-        '''
-        if not os.path.isfile(pca_path):
-            while True :
-                try:
-                    pca_path=raw_input('Enter pca object file path: ')
-                    if os.path.isfile(pca_path):
-                        break
-                    else:
-                        print 'File does not exist! Try again!'
-                except SyntaxError:
-                    print 'Try again'
-	'''
-	
-        print "File : {0}".format(pca_path)
+    rospy.init_node('laser_listener', anonymous=True)
+    if pause_function:
+	stdscr = curses.initscr()
+	curses.cbreak()
+	stdscr.keypad(1)
+	stdscr.timeout(0);
 
-        rospy.init_node('laser_listener', anonymous=True)
-        #ADDITIONS command line inputs klp
-        scan_topic = str(sys.argv[3])
-        timewindow = int(sys.argv[4])
-        while not RepresentsInt(timewindow):
-            timewindow=input('Set timewindow in frames: ')
-            if RepresentsInt(timewindow):
-                break
-            else:
-                print 'Try again'
-        range_limit = float(sys.argv[5])
-        while not (RepresentsInt(range_limit) or RepresentsFloat(range_limit)):
-            range_limit=input('Set maximum scan range in m: ')
-            if RepresentsInt(range_limit):
-                break
-            else:
-                print 'Try again'
 
-        metrics = int(sys.argv[6])
-        while not (RepresentsInt(metrics) and metrics != '1' and metrics != '0'):
-            metrics=input('Set if you want performance metrics or not: ')
-            if RepresentsInt(metrics):
-                break
-            else:
-                print 'Try again'
-
-    if metrics == 1:
+    if metrics:
 	global store_file
 
 	print 'Please give a filename for storage.'
@@ -205,55 +137,43 @@ def laser_listener():
 	    print 'You have to give a valid filename.'
 	    exit()
 
-    print "metrics: ",metrics
-    print "Classifier object path : ", class_path 
-    print "PCA object path : ", pca_path
-    print "Scan Topic : ", sub_topic
-    print "Timewindow (frames) : ",timewindow
-    print "Maximum scan range (meters)", range_limit
     print "Waiting for laser scans ..."
-    #ADDITIONS command line inputs klp
    
  
-    rospy.Subscriber(sub_topic,LaserScan,online_test)
-    scan_received=rospy.Time.now().to_sec()
-    gaussian, pca_obj = loadfiles()
+    rospy.Subscriber(scan_topic,LaserScan,online_test)
+    LDA_classifier = loadClassifier()
     while not rospy.is_shutdown():  
         rospy.spin()
     #we come here when Ctrl+C is pressed, so we can save!
-    if metrics == 1:
+    if metrics:
         b={}
         b['timewindow']=timewindow
         b['range_limit']=range_limit
         b['angle_increment']=angle_increment
-        #b['scan_time']=scan_time
         b['angle_min']=angle_min
         b['angle_max']=angle_max
         b['intensities']=intensities
         b['wall']=wall
-        #print b['wall']
-        #b['annotations']=annotations
-        #b['ranges']=ranges_
         try:
             os.remove('classification_results.mat')
         except OSError:
             pass
         sio.savemat('classification_results',b);
 
-    print 'duration in milliseconds = {0}'.format(total_cluster_time)
 
-    if metrics == 1:
+    if metrics:
     	get_accuracy(all_annotations,tot_results)
     	save_data(all_clusters, all_orthogonal, all_gridfit, all_hogs, all_annotations)
-    print "D O N E !"
-    #Calculate_Metrics(annotated_data)
-    #sys.exit()
+    if pause_function:
+	curses.nocbreak()
+	stdscr.keypad(0)
+    	curses.echo()
+    	curses.endwin()
 
 
 def online_test(laser_data):
-    global wall_flag, wall, fr_index, intens, w_index, phi, sampling, limit #prosthesa to limit edw giati den to epairne global
-    global phi, mybuffer, z, zscale, gaussian,timewindow , wall_cart,ax, ax3 ,fig1,fig4, kat
-    global pca_obj, pca_plot
+    global wall_flag, wall, fr_index, w_index, sampling, limit
+    global phi, mybuffer, z, zscale, LDA_classifier, timewindow , wall_cart, ax, ax3 , top_view_figure
     global ranges_, intensities, angle_increment, scan_time, angle_min, angle_max, first_time_ranges, total_cluster_time
     global mybuffer2, num_c
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
@@ -264,15 +184,31 @@ def online_test(laser_data):
     global trace_results, cls_results
     global traced_clusters, first_trace, max_cls
 
+    global pause, pause_function, stdscr, num_of_diagrams
+
+    if pause_function:
+    	key = stdscr.getch()
+    	stdscr.refresh()
+    	if key == curses.KEY_ENTER or key == 10:
+		pause = not pause
+        	print '\033[93m '+ str(pause) + ' \033[0m'
+
+    laser_ranges = list(laser_data.ranges)
+    for i in range(0, len(laser_ranges)):
+	if laser_ranges[i]>range_limit:
+		j = i - 1;
+		while  laser_ranges[j] > range_limit:
+			j = j - 1;
+			if j == 0:
+				break;
+		laser_ranges[i] = laser_ranges[j];
     millis_start = int(round(time.time() * 1000))
     if wall_flag == 0:
-        #print "-------------- 1"
-        if w_index == 1:
-            #print "-------------- 2"
-            sampling = np.arange(0,len(np.array(laser_data.ranges)),2)#apply sampling e.g every 2 steps
+        if w_index == 0:
+            sampling = np.arange(0,len(np.array(laser_ranges)),2)#apply sampling e.g every 2 steps
 
             #wall data now contains the scan ranges
-            wall = np.array(laser_data.ranges)
+            wall = np.array(laser_ranges)
             
             mybuffer = wall
             #get indexes of scans >= range_limit
@@ -282,20 +218,20 @@ def online_test(laser_data):
             w_index=w_index+1
             
         if w_index<limit: #loop until you have enough scans to set walls
-            #print "-------------- 3"
-            wall = np.array(laser_data.ranges)
+            wall = np.array(laser_ranges)
             filter = np.where(wall >= range_limit)
             wall[filter] = range_limit
             mybuffer = np.vstack((mybuffer,wall ))  #  add to buffer with size=(wall_index x 360)
             w_index = w_index+1
         if w_index==limit:
-            #print "-------------- 4"
             mybuffer = np.vstack((mybuffer,wall ))
             phi = np.arange(laser_data.angle_min,laser_data.angle_max,laser_data.angle_increment)[sampling]
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0) ) #convert to Cartesian
             wall_flag = 1
-            kat,ax,ax3=initialize_plots(wall_cart)
+	    
+	    if num_of_diagrams > 0:
+	            initialize_plots(wall_cart)
 
             angle_increment=laser_data.angle_increment
             scan_time=laser_data.scan_time
@@ -307,22 +243,20 @@ def online_test(laser_data):
         
     else:
         #walls are set, process scans
-        #print "-------------- 5"
-        ranges = np.array(laser_data.ranges)[sampling]
+	ranges = np.array(laser_ranges)[sampling]
         filter = np.where(ranges < wall) # filter out walls
         ranges = ranges[filter]
         theta = phi[filter]
 
 
-        if metrics == 1:
+        if metrics:
             if first_time_ranges:
-                ranges_= np.array(laser_data.ranges)[sampling]
+                ranges_= np.array(laser_ranges)[sampling]
                 first_time_ranges = False
             else:
-                ranges_ = np.vstack((ranges_, np.array(laser_data.ranges)[sampling]))
+                ranges_ = np.vstack((ranges_, np.array(laser_ranges)[sampling]))
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
-            #print "-------------- 6"
             C = np.array(pol2cart(ranges,theta,z) ) #convert to Cartesian
 
 
@@ -366,7 +300,7 @@ def online_test(laser_data):
 
 def pol2cart(r,theta,zed):
 
-    #convert cylindical coordinates to cartesian ones
+    #convert polar coordinates to cartesian ones
     x=np.multiply(r,np.cos(theta))
     y=np.multiply(r,np.sin(theta))
     z=np.ones(r.size)*zed
@@ -374,53 +308,69 @@ def pol2cart(r,theta,zed):
     return C
 
 
-def loadfiles():
+def loadClassifier():
     
-    global class_path
-    global all_annotations
-    global pca_path
+    global classifier_path
     
 
-    classifier = pickle.load( open( class_path, "rb" ) )
-    #pca_obj = pickle.load(open ( pca_path, "rb"))
-    #all_annotations = pickle.load(open("cluster_labels/video5annotations.p","rb"))
-    mat=sio.loadmat("cluster_labels/video5_labels.mat")
-    #all_annotations=mat['annotations'][0]
-    #print 'AN = ',len(all_annotations)
+    classifier = pickle.load( open( classifier_path, "rb" ) )
     
-    return classifier, pca_obj
+    return classifier
 
 
 def initialize_plots(wall_cart):
-    global fig1,fig4
+    global plot_figure, top_view_figure, ax, ax3, num_of_diagrams
 
-    #2D projection of the cluster
+    if num_of_diagrams == 2:
+    	plot_figure = plt.figure() 
+    	top_view_figure = plot_figure.add_subplot(1,2,1)
+	top_view_figure.set_title("Top view")
+    	top_view_figure.set_xlabel('Vertical distance')
+    	top_view_figure.set_ylabel('Robot is here')
+    	top_view_figure.plot(wall_cart[:,0],wall_cart[:,1])
     
-    temp=plt.figure()
-    plot2d = temp.add_subplot(111)
-    plot2d.set_xlabel('Vertical distance')
-    plot2d.set_ylabel('Robot is here')
-    plot2d.plot(wall_cart[:,0],wall_cart[:,1])
-    
 
 
-    #3D clusters
-    fig1=plt.figure()
-    plot3d= fig1.gca(projection='3d')
-    plot3d.set_xlabel('X - Distance')
-    plot3d.set_ylabel('Y - Robot')
-    plot3d.set_zlabel('Z - time')
+    	ax = plot_figure.add_subplot(1,2,2,projection='3d')
+    	ax.set_title("3D view")
+    	ax.set_xlabel('X - Distance')
+    	ax.set_ylabel('Y - Robot')
+    	ax.set_zlabel('Z - Time')
 
-    #translate and rotate the 3D cluster
-    fig4=plt.figure()
-    plot_align= fig4.gca(projection='3d')
-    plot_align.set_xlabel('X - Distance')
-    plot_align.set_ylabel('Y - Robot')
-    plot_align.set_zlabel('Z - time')
+    elif num_of_diagrams == 3:
+        plot_figure = plt.figure()
+        top_view_figure = plot_figure.add_subplot(2,2,1)
+        top_view_figure.set_title("Top view")
+        top_view_figure.set_xlabel('Vertical distance')
+        top_view_figure.set_ylabel('Robot is here')
+        top_view_figure.plot(wall_cart[:,0],wall_cart[:,1])
 
+
+
+        ax = plot_figure.add_subplot(2,2,2,projection='3d')
+        ax.set_title("3D view")
+        ax.set_xlabel('X - Distance')
+        ax.set_ylabel('Y - Robot')
+        ax.set_zlabel('Z - Time')
+
+        ax3 = plot_figure.add_subplot(2,2,3,projection='3d')
+        ax3.set_title("Aligned 3D clusters")
+        ax3.set_xlabel('X - Distance')
+        ax3.set_ylabel('Y - Robot')
+        ax3.set_zlabel('Z - Time')
+
+    elif num_of_diagrams == 1:
+        plot_figure = plt.figure()
+        top_view_figure = plot_figure.add_subplot(1,1,1)
+        top_view_figure.set_title("Top view")
+        top_view_figure.set_xlabel('Vertical distance')
+        top_view_figure.set_ylabel('Robot is here')
+        top_view_figure.plot(wall_cart[:,0],wall_cart[:,1])
+
+ 
 
     plt.show()
-    return plot2d,plot3d,plot_align
+    #return plot2d,plot3d,plot_align
 
 def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
     global store_file
@@ -473,11 +423,11 @@ def multiply_array(x,y,z, V) :
 
 def clustering_procedure(clear_data, num_c):
 
-    global cc, ccnames, fig1, z, z_scale, fig4
+    global cc, ccnames, z, z_scale, _3d_figure
     global all_clusters,all_hogs,all_gridfit,all_orthogonal
     global tot_results, all_annotations, metrics
+    global pause
     
-    #warnings.filterwarnings("ignore", category=DeprecationWarning)
     hogs=[]
     colors=[]
     align_cl=[]	#contains the aligned data clouds of each cluster
@@ -490,18 +440,12 @@ def clustering_procedure(clear_data, num_c):
 
     max_label=int(np.amax(cluster_labels))
 
-
-    #[xi,yi,zi]: the array of data points of the specific frame
     [xi,yi,zi] = [clear_data[:,0] , clear_data[:,1] , clear_data[:,2]]
-
-    fig1.clear()
-    #fig4.clear()
 
     #for every created cluster - its data points
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
         if len(filter[0])>40 :
-	    print ' cluster ',k
 
             valid_flag=1
 
@@ -513,28 +457,23 @@ def clustering_procedure(clear_data, num_c):
 	    all_clusters.append([xk,yk,zk])
 
 
-	    #we get U by appying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimention.
+	    #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimention.
 	    U,s,V=np.linalg.svd(np.cov([xk,yk,zk]), full_matrices=False)
-	    #print 'U = {} s = {} V={}'.format(U,s,V)
 
 	    #translate each cluster to the begining of the axis and then do the rotation
 	    [xnew,ynew,znew]=translate_cluster(xk,yk,zk)
 
 	    #(traslation matrix) x (rotation matrix) = alignemt of cluster
-	    #alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
+	    alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
 	    alignment_result=multiply_array(xnew,ynew,znew, V)
 	
-	    #print 'x = {} \n align_x = {}'.format(xk, alignment_result[0])
-	    steps2(xk,yk,zk)
-	    #steps3(xk,yk,zk)
+	    #steps2(xk,yk,zk)
 
 	    
 	    cls.append([xk,yk,zk])
 	    
 	    align_cl.append(alignment_result)
 	    all_orthogonal.append(alignment_result)
-
-	    #steps3(alignment_result[0], alignment_result[1], alignment_result[2])
 
 	    vcl.append(k)
             colors.append(ccnames[k%12])
@@ -552,23 +491,31 @@ def clustering_procedure(clear_data, num_c):
 	
     if valid_flag != 0:    
     	trace(cls)
-    	fig1.show()
-    #fig4.show()
 
 
-    update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
+	#3d_figure.show()
+    if pause_function:
+    	print '\033[93m '+ str(pause) + ' \033[0m'
+    if not pause:
+	#_3d_figure.clear()
+	if num_of_diagrams > 1:
+		ax.clear()
+		ax.set_title("3D view")
+    		ax.set_xlabel('X - Distance')
+    		ax.set_ylabel('Y - Robot')
+    		ax.set_zlabel('Z - Time')
+
+    	update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
 
 
 #choice parameter declares the first (True) or the last (False) part of cluster
 def get_centroid(cluster, choice):
 
-    #print 'general cluatser = {}'.format(cluster)
     if choice == True:
         z_filter = np.where(cluster[2]==cluster[2][len(cluster[2])-1])
     else:
 	z_filter = np.where(cluster[2]==cluster[2][0])
 
-    #print 'cl x = {} y = {}'.format(cluster[0][z_filter], cluster[1][z_filter])
     mean_x = np.mean(cluster[0][z_filter])
     mean_y = np.mean(cluster[1][z_filter])
 
@@ -583,8 +530,6 @@ def create_trace():
     temp = []
     counter = 1
 
-    print 'CREATE TRACE:'
-
     for j in range(0,max_cls):
 
 	for i in range(0, len(trace_results)):
@@ -593,12 +538,9 @@ def create_trace():
 		temp.append(cls_results[i][trace_results[i].index(-1)])
 	    if j in trace_results[i]:
 		temp.append(cls_results[i][trace_results[i].index(j)])
-		#print 'length of added cluster = ',len(cls_results[i][trace_results[i].index(j)][0])
 
 	traced_clusters.append(temp)
 	temp=[]
-
-    #print 'now traced clusters are: {}'.format(traced_clusters)
 
 def continue_trace():
 
@@ -607,13 +549,10 @@ def continue_trace():
 
     last_element = len(trace_results) - 1
 
-    print 'CONTINUE TRACE: length of last element ',len(trace_results[last_element])
-
     for i in range(0, len(trace_results[last_element])):
 	index = trace_results[last_element][i]
 
 	if index != -1:
-	    #print 'index != 11 '
 	    if len(traced_clusters[index]) == 4:
 	    	del traced_clusters[index][0]
 
@@ -621,22 +560,15 @@ def continue_trace():
 	else:
 	    traced_clusters.append([cls_results[last_element][i]])
 
-    '''
-    if len(traced_clusters) > len(trace_results[last_element]) :
-	for i in range(len(traced_clusters)-len(trace_results[last_element])+1 , len(traced_clusters)):
-	    del traced_clusters[i]
-    '''
-    #print 'now num of traced clusters is: {}'.format(len(traced_clusters[0]))
-
 
 def trace(cls):
     global trace_array
     global trace_count, track_parts
 
-    global trace_results, cls_results, fig4
+    global trace_results, cls_results, trace_3d_figure
     global traced_clusters, first_trace, max_cls
 
-    global step_counter
+    global step_counter, num_of_diagrams
 
     error = 100
     min_dist = -1.0
@@ -645,10 +577,7 @@ def trace(cls):
     temp_list = []
     flag = True
 
-    print 'TRACE PROCEDURE:'
-
     if len(trace_array) == 0:
-	print 'first time'
 	for i in range(0, len(cls)):
 	    trace_array.append(get_centroid(cls[i], False))
 	    trace_results.append([i])
@@ -675,24 +604,21 @@ def trace(cls):
     	for i in range(0, len(first)):
 	    if flag == False:
     	    	coord = get_centroid(first[i], True)
+        
+        for j in range(0, len(second)):
+            #eucl_dist for every combination
 
-	    for j in range(0, len(second)):
-	    #eucl_dist for every combination
-		#print '2nd for: i = ', i , ' j = ',j
-
-		if flag:
-		    coord = get_centroid(second[j], True)
-	    	    d = dist.euclidean(coord,first[i])
-		    #print 'for flag==true:	 first[i] = {}	  coord = {}	 d={}'.format(first[i],coord,d)
-	    	    temp_list.append(d)
-		else:
-	    	    d = dist.euclidean(coord,second[j])
-		    #print 'for flag==false: second[j]	  coord = {}	 d={}'.format(second[j],coord,d)
-	    	    temp_list.append(d)
+            if flag:
+                coord = get_centroid(second[j], True)
+                d = dist.euclidean(coord,first[i])
+                temp_list.append(d)
+            else:
+                d = dist.euclidean(coord,second[j])
+                temp_list.append(d)
 	    
-	    list_dist.append(temp_list)
+        list_dist.append(temp_list)
 	    
-	    temp_list = []	    
+        temp_list = []	    
 	    
 	min_val = -1.0
 	row = 0
@@ -703,13 +629,10 @@ def trace(cls):
 	temp_list = list(list_dist)
 	length = len(list_dist)
 
-	#if flag:
 	for i in range(0,len(cls)):
 	    results.append(-1)
 
-	print 'list dist = {}'.format(list_dist)
 	while num<length:
-	    #temp_list = list_dist[num]
 	    for i in range(0, len(temp_list)):
 	    	if min_val == -1.0:
 		    min_val = min(temp_list[i])
@@ -725,8 +648,7 @@ def trace(cls):
 		    break
 
 
-	    if flag:		
-		#results.insert(list_dist[row].index(min_val),row)
+	    if flag:
 		results[list_dist[row].index(min_val)] = row
 		
 	    else:
@@ -744,14 +666,8 @@ def trace(cls):
 	    col = -1
 	    row =0
 	    min_val = -1.0
-	
-	    
-	    
-	print 'Trace results = {}'.format(results)
+	  
 
-	
-	
-	
 	# a cluster disappears
 	if len(results) < len(trace_array) and len(traced_clusters) != 0:
 	    rm_list = []
@@ -763,12 +679,6 @@ def trace(cls):
 	    	del traced_clusters[rm_list[i]][:]
 		trace_count = True
 
-
-	#if len(results) < len(cls):
-	#length = len(cls)-len(results)
-	#for i in range(length-1, len(cls)):
-	#    results.append(11)
-
 	#remove previous and add the new ones
 	del trace_array[:]
 	for i in range(0, len(cls)):
@@ -778,43 +688,46 @@ def trace(cls):
 	trace_results.append(results)
 	cls_results.append(cls)
 
-	print '!!!! length of trace results = ',len(trace_results)
 	#the maximum number of clusters
 	if max_cls < len(results):
 	    max_cls = len(results)
 
 	if len(trace_results) == track_parts:
-	    fig4.clear()
+	    if not pause:
+            	#trace_3d_figure.clear()
+		if num_of_diagrams > 2:
+			ax3.clear()
+			ax3.set_title("Aligned 3D clusters")
+			ax3.set_xlabel('X - Distance')
+			ax3.set_ylabel('Y - Robot')
+			ax3.set_zlabel('Z - Time')
 
-	    if first_trace:
-		create_trace()
-		first_trace = False
-		step_processing()
-		
-	    else:
-		continue_trace()
-		step_counter  = step_counter + 1
 
-	    if step_counter == track_parts:
-		step_processing()
-		step_counter = 0
+	    	if first_trace:
+			create_trace()
+			first_trace = False
+			step_processing()
 		
-	    #display in plot
-		
-	    fig4.show()
-	    plot_trace()
-	    #fig4.show()
+	    	else:
+			continue_trace()
+			step_counter  = step_counter + 1
 
-	    del trace_results[0]
-	    del cls_results[0]
-	    max_cls = len(results)
+	    	if step_counter == track_parts:
+			step_processing()
+			step_counter = 0
+		
+            #display in plot
+            #trace_3d_figure.show()
+            plot_trace()
+
+            del trace_results[0]
+            del cls_results[0]
+            max_cls = len(results)
 
 
 def plot_trace():
 
-    global traced_clusters,fig4,ax3, basic_counter, pca_path
-
-    print 'PLOT TRACE '
+    global traced_clusters,trace_3d_figure,ax3, basic_counter, save_folder
 
     for i in range(0, len(traced_clusters)):
 	if len(traced_clusters[i]) == 0:
@@ -829,20 +742,17 @@ def plot_trace():
 	    for j in range(1, len(traced_clusters[i])):
 		xar = np.append(xar,traced_clusters[i][j][0])
 		yar = np.append(yar,traced_clusters[i][j][1])
-		#zar = np.append(zar,traced_clusters[i][j][2])
 		B = traced_clusters[i][j][2].copy()
 
 		B[::1]  += zar[len(zar) - 1]
-		#print 'B = {}'.format(B)
-		#print 'last element {}'.format(zar[len(zar) - 1])
 		zar =  np.append(zar,B)
 
-	#[x,y,z] = [traced_clusters[i][0][:,0], traced_clusters[i][0][:,1], traced_clusters[i][0][:,2]]
-
-	ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
-        fig4.add_axes(ax3)
-
-	fig4.savefig(pca_path+'tracedCl_'+str(basic_counter), format='png')
+	if num_of_diagrams > 2:
+		ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
+        #trace_3d_figure.add_axes(ax3)
+	
+	#UNCOMMENT THE LINE BELOW TO SAVE A SCREENSHOT!
+	#trace_3d_figure.savefig(save_folder+'tracedCl_'+str(basic_counter), format='png')
 	plt.pause(0.0001)
 
 
@@ -889,7 +799,6 @@ def get_accuracy(ann, results):
 	    F=F+1
 
     acc=100*T/(T+F)
-    print 'acc = {}'.format(acc)
 
 
 #gets the local minimums and maximums of the st.deviation matrix
@@ -901,8 +810,6 @@ def compute_steps(dev) :
     min_array = []
     max_array = []
     m = round(sum(dev)/len(dev),2)
-
-    #print 'compute steps ... '
 
     if dev[0] < dev[1] :
 	if diff_error2(dev[0], m):
@@ -936,92 +843,7 @@ def compute_steps(dev) :
     elif dev[len(dev)-2] == dev[len(dev)-1] :
 	if diff_error2(dev[len(dev)-1], m):
 	    max_array.append(len(dev)-1)
-    print 'max = {}    min = {}'.format(max_array, min_array)
-
-
-
-    #remove min and max that are in sequence
-    #every two min or two max -> + 1 step
-    #if a min/max is between two local max/min respectively  -> + 0.5 step
-    steps = 0.0
-
-    if len(min_array) == 0 and len(max_array) == 0 or len(min_array) == 0 and len(max_array) == 1 or len(min_array) == 1 and len(max_array) == 0 or len(min_array) == 1 and len(max_array) == 1:
-	steps = 0
-    elif len(max_array) >= 2 and (len(min_array) == 1 or len(min_array) == 0): 
-	new_max = []
-    	for i in range(0, len(max_array)-1) :
-	    if max_array[i] +1 != max_array[i+1]:
-	   	new_max.append(max_array[i])
-
-    	if max_array[len(max_array)-2] +1 != max_array[len(max_array)-1]:
-	    new_max.append(max_array[len(max_array)-1])
-	
-	steps = len(new_max) - 1.0
-    elif len(min_array) >= 2 and (len(max_array) == 1 or len(max_array) == 0): 
-	new_min = []
-    	for i in range(0, len(min_array)-1) :
-	    if min_array[i] +1 != min_array[i+1]:
-	   	new_min.append(min_array[i])
-
-        if min_array[len(min_array)-2] +1 != min_array[len(min_array)-1]:
-	    new_min.append(min_array[len(min_array)-1])
-	
-	steps = len(new_min) - 1.0
-    else:
-    	new_min = []
-        for i in range(0, len(min_array)-1) :
-	    if min_array[i] +1 != min_array[i+1]:
-	   	new_min.append(min_array[i])
-
-        if min_array[len(min_array)-2] +1 != min_array[len(min_array)-1]:
-	    new_min.append(min_array[len(min_array)-1])
-
-	new_max = []
-    	for i in range(0, len(max_array)-1) :
-	    if max_array[i] +1 != max_array[i+1]:
-	   	new_max.append(max_array[i])
-
-    	if max_array[len(max_array)-2] +1 != max_array[len(max_array)-1]:
-	    new_max.append(max_array[len(max_array)-1])
-
-	if len(new_min) == 0 and len(new_max) == 0 or len(new_min) == 0 and len(new_max) == 1 or len(new_min) == 1 and len(new_max) == 0 or len(new_min) == 1 and len(new_max) == 1:
-	    steps = 0
-    	elif len(new_max) >= 2 and (len(new_min) == 1 or len(new_min) == 0): 
-	    steps = len(new_max) - 1.0
-	elif len(new_min) >= 2 and (len(new_max) == 1 or len(new_max) == 0): 
-	    steps = len(new_min) - 1.0
-	else:
-	    if new_min[0] > new_max[0]:
-		first = new_max
-		second = new_min
-	    else:
-		first = new_min
-		second = new_max
-	    fv1 = first[0]
-	    fv2 = first[1]
-	    del first[0]
-	    steps = steps + 1.0
-
-	    while len(first) != 0 and len(second) != 0:
-		if fv1 < second[0] and fv2 > second[0]:
-		    steps = steps + 0.5
-		else:
-		    steps = steps + 1.0
-
-		if len(second) == 1:
-		    break
-		fv1 = second[0]
-		fv2 = second[1]
-		del second[0]
-	
-		temp = first
-		first = second
-		second = temp
-    
-	    if len(first) >=2:
-		steps = steps + len(first) -1
-
-    print 'Compute steps :  ',steps
+    #print 'Compute steps :  ',steps
     tot_steps.append(steps)
 
 
@@ -1047,7 +869,7 @@ def diff_error2(value, m):
 
 def steps3(x, y, z):
 
-    global scan_parts, step_parts,fig4,ax3
+    global scan_parts, step_parts, trace_3d_figure, ax3
 
     num = 0
     split = len(x)/step_parts
@@ -1057,7 +879,6 @@ def steps3(x, y, z):
     arr = np.array(x)
     newx = arr.argsort()[:len(x)]
 
-    print 'STEPS 3'
     newy = []
     newz = []
     c=0
@@ -1091,18 +912,12 @@ def steps3(x, y, z):
 
 	c=c+1
 
-	#ax3.scatter(xn,yn, zn, 'z', 30, cc[c%12]) 
-	#fig4.add_axes(ax3)
-	#fig4.show()
-
 	
 	if len(x)-num < split :
 	    	split = len(x)-num
 		flag = True
 	
 
-    print 'deviation = {}'.format(dev2)
-    #steps_from_deviation(dev2)
     compute_steps(dev2)
     
 
@@ -1111,7 +926,7 @@ def steps3(x, y, z):
 # compute the standard deviation by median and not the avg of points
 def steps2(x, y, z):
 
-    global scan_parts, step_parts, fig4, ax3
+    global scan_parts, step_parts, trace_3d_figure, ax3
 
     num = 0
     split = len(x)/step_parts
@@ -1146,8 +961,6 @@ def steps2(x, y, z):
 		flag = True
 	
 
-    print 'deviation = {}'.format(dev2)
-    #steps_from_deviation(dev2)
     compute_steps(dev2)
 
 
@@ -1155,7 +968,7 @@ def steps2(x, y, z):
 # compute the standard deviation by median and not the avg of points
 def steps(x, y, z):
 
-    global z_scale, scan_parts,ax3,fig4
+    global z_scale, scan_parts,ax3,trace_3d_figure
 
     z_angle = z[0]
     count = 0 
@@ -1182,12 +995,7 @@ def steps(x, y, z):
 
 	else:
 	    
-    	    if len(xk) !=0 and len(yk) !=0:
-		#ax3.scatter(xk,yk, zk, 'z', 30, cc[c%12]) 
-		#fig4.add_axes(ax3)
-		#fig4.show()
 		arr = np.array([xk,yk,zk])
-		#print 'standard dev = {}'.format(np.std(arr))
 		
 		deviation.append(round(np.std(arr),2))
 
@@ -1244,10 +1052,6 @@ def steps(x, y, z):
 	    temp_i = i
 
     dev = np.array(deviation)
-   # min_dev = np.where(dev == dev.min())
-
-    print 'deviation : {} \n '.format(deviation)
-    print 'dev2 {}'.format(dev2)
 
     compute_steps(dev2)
 
@@ -1288,8 +1092,6 @@ def speed(x, y, z) :
 		    xk.append(x[z_filter][i])
 	    	    yk.append(y[z_filter][i])
 		count = 0
-
-		#dist = dist + math.sqrt(math.pow(x2-x1, 2) + math.pow(y2-y1, 2))
 	    
 	count = count+1
 	z_angle = z_angle + z_scale
@@ -1305,16 +1107,15 @@ def speed(x, y, z) :
     #compute the speed at each scan -> m/sec
     scan_speed = d/(z_angle - z[0])
 
-    print ' SPEED = ',scan_speed
     tot_speed.append(scan_speed)
 
 
 
 def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
     
-    global fig1, ax, ax3, wall_cart, gaussian, classification_array, pca_obj, hogs_temp, align_plot, fig4,kat
-    global annotations, first_time, all_annotations,annotated_humans,annotated_obstacles
-    global tot_results, metrics, f_time
+    global _3d_figure, ax, ax3, wall_cart, LDA_classifier, hogs_temp, align_plot, trace_3d_figure, top_view_figure
+    global first_time_annotations, all_annotations
+    global tot_results, metrics, first_time_results, num_of_diagrams
 
     temp = []
     store_results = []
@@ -1323,32 +1124,31 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
     centerz = []
 
 
-    #zscore the entire hogs table, not single cluster hogs
     if flag==1:
-        kat.clear()
-        kat.plot(wall_cart[:,0],wall_cart[:,1])
+	if num_of_diagrams > 0:
+        	top_view_figure.clear()
+		top_view_figure.set_title("Top view")
+    		top_view_figure.set_xlabel('Vertical distance')
+    		top_view_figure.set_ylabel('Robot is here')
+
+        	top_view_figure.plot(wall_cart[:,0],wall_cart[:,1])
 
         if np.array(hogs).shape==(1,36):
-            #temp = zscore(np.array(hogs)[0])
             temp = np.array(hogs)[0]
 
         else:
             for i in range(0,len(hogs)):
-                #temp.append(zscore(np.array(hogs[i])))
                 temp.append(np.array(hogs[i]))
         
 
-	#temp_pca = pca_obj.transform(temp)
-        #results = gaussian.predict(temp_pca)
-	results = gaussian.predict(temp)
-        print results
-
+	results = LDA_classifier.predict(temp)
+	print results
         cnt=0
 	col_list=[]
 
 
         for k in vcl:
-	    #fig1.clear()
+
             filter=np.where(cluster_labels==k)
             
             [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
@@ -1360,51 +1160,40 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
 		print 'out of data'
 		continue
 
-	    #print '!!! LENGTH trace ',len(trace_results), ' cnt = ',cnt
-	    #print 'xc = {} align_cl[cnt][0] ={}'.format(xc,align_cl[cnt][0])
 
             if results[cnt]==1:
-                #classification_array.append(1)
-                kat.scatter(x,y,s=20, c='r')
-                #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #human
-		ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #human
-                fig1.add_axes(ax)
+		if num_of_diagrams > 0:
+                	top_view_figure.scatter(x,y,s=20, c='r')
+		if num_of_diagrams > 1:
+			ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #human
+                #_3d_figure.add_axes(ax)
 
-		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #human
-                #fig4.add_axes(ax3)
             else:
-                #classification_array.append(0)
-                kat.scatter(x,y,s=20, c='b')
-                #ax.scatter(x,y, zed, 'z', 30, cc[trace_results[cnt]%12]) #object
-		ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #obj
-                fig1.add_axes(ax)
+		if num_of_diagrams > 0:
+                	top_view_figure.scatter(x,y,s=20, c='b')
+		if num_of_diagrams > 1:
+			ax.scatter(x,y, zed, 'z', 30, cc[k+1%12]) #obj
+                #_3d_figure.add_axes(ax)
 
-		#ax3.scatter(xc,yc, zc, 'z', 30, cc[k%12]) #obj
-                #fig4.add_axes(ax3)
-
-	    #plt.imshow(grids[cnt], cmap = 'gray', interpolation = 'bicubic')
-	    #plt.show()
 	    cnt=cnt+1
-	    #fig1.show()
+
             plt.pause(0.0001)
 
-	    if metrics == 1 :
+	    if metrics:
 	    	ha = raw_input()
             	if (int(ha)==1 or int(ha)==0):
                 	ha = int(ha)
                 	
-
-			#all_annotations.append(ha)
 	    
-			if first_time:
+			if first_time_annotations:
                 		all_annotations = np.array(ha)
 				tot_results = np.array(results)
-                		first_time = False
+                		first_time_annotations = False
             		else:
                 		all_annotations=np.hstack((all_annotations,np.array(ha)))
 				
-
-	store_info(results)
+        #UNCOMMENT TO STORE INFO
+	#store_info(results)
 
 
 
@@ -1414,31 +1203,22 @@ def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
 	file_name.write("\n")
 	file_name.close()
 
-        if metrics == 1:
-            if f_time:
+        if metrics:
+            if first_time_results:
                 tot_results = np.array(results)
-                f_time = False
+                first_time_results = False
             else:
 		tot_results=np.hstack((tot_results,np.array(results)))	
-
-	'''
-        if metrics == 1:
-            if first_time:
-                annotations = np.array(results)
-                first_time = False
-            else:
-                annotations=np.hstack((annotations,np.array(results)))
-	'''
-	
 
 	hogs_temp = np.array(np.array(temp))
   
       
 def store_info(results):
 
-    global basic_counter, fig1, pca_path, tot_steps, tot_speed
-
-    fig1.savefig(pca_path+'cluster_'+str(basic_counter), format='png')
+    global basic_counter, _3d_figure, save_folder, tot_steps, tot_speed
+    
+      
+    _3d_figure.savefig(save_folder+'cluster_'+str(basic_counter), format='png')
 
     file_name=open('general_info.txt','a')
     file_name.write("id: "+str(basic_counter))
@@ -1463,11 +1243,4 @@ def store_info(results):
 
 
 if __name__ == '__main__':
-    laser_listener()
-
-
-
-
-
-
-      
+    laser_listener()   

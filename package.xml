@@ -19,7 +19,7 @@
   <!-- Example: -->
   <!-- <url type="website">http://wiki.ros.org/paexample</url> -->
 
-  <url type="repository">https://github.com/roboskel/Human-Pattern-Recognition</url>
+  <url type="repository">https://github.com/roboskel/HumanPatternRecognition</url>
 
   <author email="t.varvadoukas@gmail.com">Theodoros Varvadoukas</author>
   <author email="athanasia.sapountzi@gmail.com">Athanasia Sapountzi</author>

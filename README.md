@@ -1,68 +1,28 @@
 #Installation Instructions:
-Download scripts in an existing ROS package
+Download this ROS package inside a catkin workspace.
 
-Download needed libraries:
+#Working with the below library versions:
 
-	sudo apt-get install python-scipy python-sklearn
+scikit-image==0.12.3
+scikit-learn==0.15.1
+scipy==0.13.3
+numpy==1.10.1
+matplotlib==1.3.1
 
-Tested on R.O.S. Hydro, 
-
-Ubuntu 12.04,
-
-Python v. 2.7.3,
-
-Scipy v. 0.9.0,
-
-Sklearn v. 0.10,
-
-#Requirements:
-
-Laser scanner F.O.V : +- 45 deg.,
-
-Intensity publishing enabled(not used yet)
+It is really important to install the indicated versions of the libraries because older versions
+are much slower. (pip recommended)
 
 RECOMMENDATIONS:
 	
-	1) Run the Sample Run first. It will help you understand what each .py does.
-	2) Use same timewindow, and wall set time for each training set, and use the same values when
+	Use same timewindow, and wall set time for each training set, and use the same values when
 	evaluating.
+
+#Running out-of-the-box
+	roslaunch human_pattern_recognition hpr.launch
+	The script is now waiting for laser scans to be published in the topic /scan. If you want to change the parameters of the script, just edit hpr.launch, or create your own .launch file.
 
 # Human-Pattern-Recognition
 Real time recongition of humans through laser scans
-
-#Sample Run
-	1)Record bag file with laser scans (.bag files are provided in video folder)
-
-	2)Open a terminal and run 
-		roscore
-
-	3)On another terminal run
-		cd 
-	  to the directory of the scripts
-
-	4)Convert a .bag file to .mat format by running 
-		python bag2mat.py video/video2.bag video/video2.mat scan 79
-
-	4.1)Convert as many as you want by changing the number of the video .bag file
-
-	5)Manually annotate the data by running 
-		python annotate.py 40 10 video/video2.mat
-
-	5.1)Annotate as many as you want by changing the number of the video .mat file
-
-	6)Create a classifier, and P.C.A. object by running 
-		python merge_train.py video/
-
-	7)Test online with the previously created classifier by running 
-		python hpr.py video/Gaussian_NB_classifier_merged.p video/PCA_object.p scan 40 10 0
-
-	8)On another terminal run
-		cd 
-	  to the directory of the scripts.
-
-	9)Run 
-		rosbag play video/video10.bag 
-	  so that the script in the previous step is triggered.
 	
 #Python files explained
 #----------------------
@@ -90,7 +50,7 @@ Command line use:
 
 #III)merge_train.py:
 
-Merge_train uses all the annotations from a folder, to create a classifier based on all of those
+This is an old file. Use recognition_procedure instead. Merge_train uses all the annotations from a folder, to create a classifier based on all of those
 annotations.
 
 
@@ -100,12 +60,12 @@ Command line use:
 	
 #IV)hpr.py:
 
-Runs the human pattern recognition (Naive Bayes) classifier.
+Runs the human pattern recognition classifier.
 
 
 Command line use:
 
-	python hpr.py <classifier_object_path> <pca_objec_path> <laserscan_topic> <timewindow_in_frames> <maximum_scan_range> <0_or_1_for_metrics>
+	roslaunch human_pattern_recognition hpr.launch
 
 #V)generate_metrics.py
 	
@@ -117,21 +77,11 @@ Command line use :
 	
 	python generate_metrics.py </path/to/classification_results.mat>
 
-#VI)hpr_mat.py :
-Runs the specified classifier on a .mat file instead of a topic.
-
-Command line use :
-
-	python hpr_mat.py <.mat_file_path> <classifier_path> <pca_object_path> <timewindow> <frames for walls> <0_or_1_for_metrics>
+#VI)recognition_procedure.py
+The python script that is now used to train the classifier. Three different classifiers can be trained, but LDA seems to be the best.
 
 #VII)Library files
 gridfit.py, myhog.py and mytools.py are libraries used to run the code. They were pre-written by others or ported to python.
 
-#VIII)online_calibration_node.py, optimal_test.py
-These two python files are not used anymore. They are still here just for legacy reasons and in case something new comes to our mind. You can freely ignore them.
-
-#IX)ideal_data.mat
-This .mat file contains the basic information regarding the laser scans. It is not used by any of our currently used scripts, but it's still here for the sake of completeness
-and future reference.
 
     
