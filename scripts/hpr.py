@@ -55,7 +55,7 @@ step_parts = 10
 trace_array = []
 trace_count = False
 
-num_of_diagrams = 0
+num_of_diagrams = 3
 
 trace_results = []
 cls_results = []
@@ -69,6 +69,7 @@ basic_counter = 0
 tot_speed = []
 tot_steps = []
 plot_figure = None
+overlap_part = []
 
 def RepresentsInt(s):
     try: 
@@ -116,7 +117,7 @@ def laser_listener():
     metrics = rospy.get_param('/human_pattern_recognition/save_metrics', False)
     pause_function = rospy.get_param('/human_pattern_recognition/pause_function', False)
     
-    num_of_diagrams = rospy.get_param('/human_pattern_recognition/num_of_diagrams', 0)
+    num_of_diagrams = rospy.get_param('/human_pattern_recognition/num_of_diagrams', 3)
 
     rospy.init_node('laser_listener', anonymous=True)
     if pause_function:
@@ -179,6 +180,7 @@ def online_test(laser_data):
     global all_clusters, all_hogs, all_gridfit, all_orthogonal,all_annotations
     global tot_results, metrics
     global trace_array
+    global overlap_part
 
     global trace_count
     global trace_results, cls_results
@@ -261,16 +263,32 @@ def online_test(laser_data):
 
 
             if (fr_index ==1 ):
-                mybuffer = C #mybuffer is the cartesian coord of the first scan
-		mybuffer2 = [C]
-		num_c = np.array(len(C))
+		if (len(overlap_part) == 0):
+                    mybuffer = C #mybuffer is the cartesian coord of the first scan
+		    mybuffer2 = [C]
+		    num_c = np.array(len(C))
+		else:
+		    mybuffer =  np.concatenate((overlap_part,C), axis=0 )
+		    overlap_part = []
+		    mybuffer2 = [C]
+		    num_c = np.array(len(C))
 	
             else :
                 mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
 		mybuffer2.append((mybuffer2,[C]))
 		num_c=np.vstack((num_c,len(C)))
 
+		if((fr_index>=timewindow-1) & (fr_index < timewindow)):
+		    if (len(overlap_part) == 0):
+			overlap_part = np.array(pol2cart(ranges,theta,0.0))
+		    else:
+		    	overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+
             if (fr_index == timewindow ):
+		#define overlap_part as the 2 last frames of the current timewindow in order to be overlaped with the first frame of the next timewindow.
+		#It is neccessary for the overlap_trace function
+		overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+
                 mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
                 mybuffer=mybuffer[np.where( mybuffer[:,0] < 5),:][0]#ignore distant points
 
@@ -307,7 +325,6 @@ def pol2cart(r,theta,zed):
     C=np.array([x,y,z]).T
     return C
 
-
 def loadClassifier():
     
     global classifier_path
@@ -320,6 +337,14 @@ def loadClassifier():
 
 def initialize_plots(wall_cart):
     global plot_figure, top_view_figure, ax, ax3, num_of_diagrams
+    global trace_3d_figure
+
+    #translate and rotate the 3D cluster
+    trace_3d_figure = plt.figure()
+    ax3= trace_3d_figure.gca(projection='3d')
+    ax3.set_xlabel('X - Distance')
+    ax3.set_ylabel('Y - Robot')
+    ax3.set_zlabel('Z - time')
 
     if num_of_diagrams == 2:
     	plot_figure = plt.figure() 
@@ -353,11 +378,12 @@ def initialize_plots(wall_cart):
         ax.set_ylabel('Y - Robot')
         ax.set_zlabel('Z - Time')
 
-        ax3 = plot_figure.add_subplot(2,2,3,projection='3d')
-        ax3.set_title("Aligned 3D clusters")
-        ax3.set_xlabel('X - Distance')
-        ax3.set_ylabel('Y - Robot')
-        ax3.set_zlabel('Z - Time')
+
+        #ax3 = plot_figure.add_subplot(2,2,3,projection='3d')
+        #ax3.set_title("Traced 3D clusters")
+        #ax3.set_xlabel('X - Distance')
+        #ax3.set_ylabel('Y - Robot')
+        #ax3.set_zlabel('Z - Time')
 
     elif num_of_diagrams == 1:
         plot_figure = plt.figure()
@@ -370,6 +396,7 @@ def initialize_plots(wall_cart):
  
 
     plt.show()
+    trace_3d_figure.show()
     #return plot2d,plot3d,plot_align
 
 def save_data(point_clouds, alignment, gridfit, hogs, annotations) :
@@ -420,7 +447,12 @@ def multiply_array(x,y,z, V) :
 
 
 
-
+#get the data from the laser scans and cluster them with DBSCAN
+#align each cluster regarding the variances of each dimension
+#gridfit each aligned cluster
+#hogs on each image for feature extraction
+#-----------------------------------------
+#calls: speed(), overlap_trace()
 def clustering_procedure(clear_data, num_c):
 
     global cc, ccnames, z, z_scale, _3d_figure
@@ -445,6 +477,7 @@ def clustering_procedure(clear_data, num_c):
     #for every created cluster - its data points
     for k in range(1,max_label+1) :
         filter=np.where(cluster_labels==k)
+
         if len(filter[0])>40 :
 
             valid_flag=1
@@ -457,10 +490,10 @@ def clustering_procedure(clear_data, num_c):
 	    all_clusters.append([xk,yk,zk])
 
 
-	    #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimention.
+	    #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimension.
 	    U,s,V=np.linalg.svd(np.cov([xk,yk,zk]), full_matrices=False)
 
-	    #translate each cluster to the begining of the axis and then do the rotation
+	    #translate each cluster to the beginning of the axis and then do the rotation
 	    [xnew,ynew,znew]=translate_cluster(xk,yk,zk)
 
 	    #(traslation matrix) x (rotation matrix) = alignemt of cluster
@@ -490,7 +523,7 @@ def clustering_procedure(clear_data, num_c):
 
 	
     if valid_flag != 0:    
-    	trace(cls)
+    	overlap_trace(cls)
 
 
 	#3d_figure.show()
@@ -511,7 +544,7 @@ def clustering_procedure(clear_data, num_c):
 #choice parameter declares the first (True) or the last (False) part of cluster
 def get_centroid(cluster, choice):
 
-    if choice == True:
+    if choice == False:
         z_filter = np.where(cluster[2]==cluster[2][len(cluster[2])-1])
     else:
 	z_filter = np.where(cluster[2]==cluster[2][0])
@@ -530,6 +563,7 @@ def create_trace():
     temp = []
     counter = 1
 
+    #for each cluster
     for j in range(0,max_cls):
 
 	for i in range(0, len(trace_results)):
@@ -561,11 +595,20 @@ def continue_trace():
 	    traced_clusters.append([cls_results[last_element][i]])
 
 
-def trace(cls):
-    global trace_array
+
+#Tracks the human walks by fitting the new set of points(frame) to the closest cluster.
+#First it finds the centroids of the last part(frame) of the previous clusters.
+#Then it connects a new cluster to a previous one, by getting the minimum euclidean distance of the new cluster's centroid and the previous clusters' centroids.
+#Finally, the function calculates an array of trace results, where:
+#	a) each index denotes the number of a new coming cluster
+#	b) the value at each index denotes the number of a previous cluster that most likely fits
+def overlap_trace(cls):
+    global trace_array	#the centroid point of each cluster at every scan
     global trace_count, track_parts
 
-    global trace_results, cls_results, trace_3d_figure
+    global trace_results  #the position of the clusters at each scan
+    global cls_results   #the set of points of each cluster at every scan
+    global trace_3d_figure
     global traced_clusters, first_trace, max_cls
 
     global step_counter, num_of_diagrams
@@ -599,26 +642,29 @@ def trace(cls):
 	else:
 	    first = cls
 	    second = trace_array
-	    flag = False	
+	    flag = False
+
+	print '[INFO]:case {}'.format(flag)	
+
 
     	for i in range(0, len(first)):
 	    if flag == False:
     	    	coord = get_centroid(first[i], True)
         
-        for j in range(0, len(second)):
+            for j in range(0, len(second)):
             #eucl_dist for every combination
 
-            if flag:
-                coord = get_centroid(second[j], True)
-                d = dist.euclidean(coord,first[i])
-                temp_list.append(d)
-            else:
-                d = dist.euclidean(coord,second[j])
-                temp_list.append(d)
+            	if flag:
+                    coord = get_centroid(second[j], True)
+                    d = dist.euclidean(coord,first[i])
+                    temp_list.append(d)
+            	else:
+                    d = dist.euclidean(coord,second[j])
+                    temp_list.append(d)
 	    
-        list_dist.append(temp_list)
+            list_dist.append(temp_list)
 	    
-        temp_list = []	    
+            temp_list = []	    
 	    
 	min_val = -1.0
 	row = 0
@@ -626,6 +672,7 @@ def trace(cls):
 	temp_num = 0
 	col = -1
 	results = []
+	
 	temp_list = list(list_dist)
 	length = len(list_dist)
 
@@ -668,6 +715,9 @@ def trace(cls):
 	    min_val = -1.0
 	  
 
+	print '[INFO]: results = {}'.format(results)
+	
+
 	# a cluster disappears
 	if len(results) < len(trace_array) and len(traced_clusters) != 0:
 	    rm_list = []
@@ -694,10 +744,10 @@ def trace(cls):
 
 	if len(trace_results) == track_parts:
 	    if not pause:
-            	#trace_3d_figure.clear()
+            	trace_3d_figure.clear()
 		if num_of_diagrams > 2:
 			ax3.clear()
-			ax3.set_title("Aligned 3D clusters")
+			ax3.set_title("Traced 3D clusters")
 			ax3.set_xlabel('X - Distance')
 			ax3.set_ylabel('Y - Robot')
 			ax3.set_zlabel('Z - Time')
@@ -717,7 +767,7 @@ def trace(cls):
 			step_counter = 0
 		
             #display in plot
-            #trace_3d_figure.show()
+            trace_3d_figure.show()
             plot_trace()
 
             del trace_results[0]
@@ -749,7 +799,7 @@ def plot_trace():
 
 	if num_of_diagrams > 2:
 		ax3.scatter(xar, yar, zar, 'z', 30, cc[i%12]) #human
-        #trace_3d_figure.add_axes(ax3)
+        	trace_3d_figure.add_axes(ax3)
 	
 	#UNCOMMENT THE LINE BELOW TO SAVE A SCREENSHOT!
 	#trace_3d_figure.savefig(save_folder+'tracedCl_'+str(basic_counter), format='png')
@@ -781,6 +831,7 @@ def step_processing():
     	steps2(xar, yar, zar)
 
 
+#get the accuracy of the specified <bag_file> by comparing the manual annotations and the predictions of the model.
 def get_accuracy(ann, results):
 
     acc=0.0
@@ -802,7 +853,7 @@ def get_accuracy(ann, results):
 
 
 #gets the local minimums and maximums of the st.deviation matrix
-#tries to compute the number of the steps with the use of this information
+#compute the number of the steps with the use of this information
 def compute_steps(dev) :
 
     global tot_steps
@@ -1057,12 +1108,14 @@ def steps(x, y, z):
 
 
 
-
+#calculates the speed of the first 25 frames (for each cluster), i.e the m/sec that the human walk for each scan.
+#it gets the median point (x,y) for every frame - set of points
+#the total distance is the sum of the euclidean distance of a point to its previous one
 def speed(x, y, z) :
 
     global z_scale, scan_parts, tot_speed
 
-    z_angle = z[0]
+    z_angle = z[0]	
     dist = 0.0
     scan_speed1 = 0.0
     mean_array = []
@@ -1070,10 +1123,9 @@ def speed(x, y, z) :
     xk = []
     yk = []
     
-
     
     while z_angle <= z[len(z)-1]:
-    	z_filter = np.where(z==z_angle)
+    	z_filter = np.where(z==z_angle) #get the positions that have the same z_angle
 	
 	if count < scan_parts:
 	    
