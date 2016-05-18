@@ -1,0 +1,4 @@
+num_c: 3
+buffer_topic: 'wall_extraction_node/buffer'
+frame_id: 'laser_link'
+clusters_topic: 'clusters'

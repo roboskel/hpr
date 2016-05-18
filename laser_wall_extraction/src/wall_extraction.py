@@ -2,7 +2,7 @@
 import roslib, rospy
 import numpy as np
 from sensor_msgs.msg import LaserScan
-from human_pattern_recognition.msg import BufferMsg
+from laser_wall_extraction.msg import BufferMsg
 
 
 wall_flag = 0
@@ -21,22 +21,24 @@ use_overlap = True
 overlap_part = []
 
 buffer_publisher = None
+frame_id = ''
 
 
 def init():
-    global range_limit, timewindow, use_overlap, buffer_publisher
+    global range_limit, timewindow, use_overlap, buffer_publisher, frame_id
 
     scan_topic = rospy.get_param('~scan_topic','scan')
     timewindow = rospy.get_param('~timewindow', 40)
     range_limit = rospy.get_param('~max_range', 10)
     use_overlap = rospy.get_param('~use_overlap', True)
     buffer_topic = rospy.get_param('~buffer_topic','~buffer')
+    frame_id = rospy.get_param('~frame_id','laser_link')
 
-    rospy.init_node('wall_extraction_node', anonymous=True)
+    rospy.init_node('laser_wall_extraction')
 
     print "Waiting for laser scans ..."
    
-    rospy.Subscriber(scan_topic,LaserScan,wall_extraction)
+    rospy.Subscriber(scan_topic, LaserScan, wall_extraction)
 
     buffer_publisher = rospy.Publisher(buffer_topic, BufferMsg, queue_size=10)
     while not rospy.is_shutdown():  
@@ -46,7 +48,7 @@ def wall_extraction(laser_data):
     global wall_flag, w_index, scan2wall_limit, range_limit, timewindow, fr_index, buffer_publisher
     global z, z_scale
     global mybuffer, wall, sampling, phi, mybuffer_tmp
-    global use_overlap, overlap_part
+    global use_overlap, overlap_part, frame_id
 
     laser_ranges = list(laser_data.ranges)
     for i in range(0, len(laser_ranges)):
@@ -129,6 +131,7 @@ def wall_extraction(laser_data):
                 if len(mybuffer>3): #at least 3 points are needed to form a cluster
                     buffmsg = BufferMsg()
                     buffmsg.header.stamp = rospy.Time.now()
+                    buffmsg.header.frame_id = frame_id
                     buffmsg.x = mybuffer[:,0]
                     buffmsg.y = mybuffer[:,1]
                     buffmsg.z = mybuffer[:,2]
