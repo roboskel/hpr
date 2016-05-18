@@ -9,15 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   std_msgs
   sensor_msgs
-  message_generation
-)
-
-find_package(OpenCV)
-
-generate_messages(
-	DEPENDENCIES
-  sensor_msgs
-	std_msgs
 )
 
 find_package(Boost 1.40 COMPONENTS program_options REQUIRED)
