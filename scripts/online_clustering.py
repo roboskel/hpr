@@ -1,16 +1,100 @@
 import math
 import numpy as np
-import heapq
+import Queue
+import scipy.spatial.distance as distance
+from scipy import special
+import my_cluster as cl
 
-current_clusters = []
-
-def onlineDBscan(x):
-
-    [m,n] = x.shape()
-
-    for i in range(0, m-1):
+prev_clusters = []	#an array that contains the <DBscanClusters> that are constructed in a previous phase. (Necessary for the online clustering)
+cluster_label = []	#the labels of the clusters until now 
+cluster_queue =  Queue.Queue(5)		#maximum size of the queue: 5 timewindows
+Eps = 0.5 #default
 
 
+def onlineDBscan(points, minPts):
+    global prev_clusters, cluster_label
+    global Eps
+    temp_outliers = [] 	#a temp list to put noise data that may be part of a cluster in the future
+
+    [m,n] = points.shape
+    max_id = int(np.amax(cluster_label))
+
+    for p in range(0, m-1):
+	dist_array = np.zeros(len(prev_clusters))
+
+	for i in range(0, len(prev_clusters)):
+	    #get the euclidean distance of the point and of the median core of each cluster
+	    dist_array[i] = distance.euclidean(prev_clusters[i].getMedian(), points[p])	
+
+	min_dist = np.amin(dist_array)
+
+	border, min_index = existMinDistance(temp_outliers, points[p], min_dist)
+
+	#the minimum distance is from an already formed cluster
+	if min_index == -1:
+	    min_index = dist_array.index(min_dist)
+	    K = prev_clusters[min_index]
+
+	    #condition where the point belongs to this cluster
+	    if dist(points[p], K.getPoints()) <= Eps:
+	    	K.addPoint(points[p])
+	    else:
+		temp_outliers.append(cl.DBscanCluster(++max_id, points[p]))
+
+	else:
+
+	    #this point is a border of this cluster but is reachable-connected with a noise point too
+	    if border:
+		pot_index = dist_array.index(min_dist)
+	    	#TODO
+		#update the outlier cluster with the point
+		#concatenate the two clusters to one -> concatenate() in my_cluster.py
+		#remove the outlier cluster from the temp list
+	    else:
+		potential_cl = temp_outliers[min_index]
+		#it forms a new cluster 
+		#	-> put the new point and update the respective cluster arrays
+		if ( (dist(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 >= minPts) ):
+		    potential_cl.addPoint(points[p])
+		    prev_clusters.append(potential_cl)
+		    del temp_outliers[min_index]
+
+		#this point belongs to the outlier cluster but a cluster is not formed yet
+		elif ( (dist(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 < minPts) ):
+		    potential_cl.addPoint(points[p])
+
+		else:
+		    # new outlier
+		    if (dist(points[p], potential_cl.getMedian()) > Eps):
+			temp_outliers.append(cl.DBscanCluster(++max_id, points[p]))
+		
+    #TODO: update the cluster_label
+    return cluster_label
+
+
+#It checks if there is a minimum distance in the set of outliers. 
+#	-> it can indicate the creation of a new cluster
+def existMinDistance(outliers, point, min_dist):
+    index = -1
+    flag = False
+
+    for i in range(0,len(outliers)):
+	temp_d = distance.euclidean(point, outliers[i].getMedian())
+
+	# there is a minimum distance in the outliers
+	if  temp_d < min_dist:
+	    min_dist = temp_d
+	    index = i
+
+	    if flag:
+		flag = False
+
+	    #case of border point (concatenation of clusters)
+	    if temp_d == min_dist:
+	    	flag = True    
+
+
+    return flag, index
 
 
 def epsilon(x,k):
@@ -66,6 +150,8 @@ def dbscan(x,k):
 # type - vector specifying type of the i-th object
 # (core: 1, border, outlier: -1)
 
+    global cluster_label
+    global Eps
 
     Eps=epsilon(x,k)
 
@@ -73,7 +159,7 @@ def dbscan(x,k):
     a=np.array(range(len(x)))
 
     #insert at the first position of x-array the index of each point, which represents its unique id
-    x=np.insert(x,0,a,1)
+    #x=np.insert(x,0,a,1)
     [m,n]=x.shape
     point_type=np.ones(m)
     cluster_label=np.ones(m)
@@ -86,7 +172,7 @@ def dbscan(x,k):
         if touched[i]==0:
 
             ob=x[i,:]
-            D=dist(ob[1:n] ,x[:,1:n])
+            D=dist(ob[0:n] ,x[:,0:n])
 	    #array of index-points where object i has dist<=eps 
             ind=np.array(np.where(D<=Eps))[0]
 
@@ -110,7 +196,7 @@ def dbscan(x,k):
                     ob=x[ind[0]]
                     touched[ind[0]]=1
                     ind=np.delete(ind,0)
-                    D=dist( ob[1:n],x[:,1:n] )
+                    D=dist( ob[0:n],x[:,0:n] )
                     i1=np.array(np.where(D<=Eps))[0]
 
                     if len(i1)>1:
@@ -132,11 +218,27 @@ def dbscan(x,k):
     point_type[myfilter]=-1
     cluster_label[myfilter]=-1
 
+    build_clusters(x)
     #heapq.heappush(heap_labels, cluster_label)
 
     return cluster_label
 
-	
+
+
+def build_clusters(points):
+    global cluster_label, prev_clusters, cluster_queue
+    temp_cl = []
+
+    max_label=int(np.amax(cluster_label))
+
+    for k in range(1,max_label+1) :
+        filter=np.where(cluster_label==k)
+
+        if len(filter[0])>40 :
+	    prev_clusters.append(cl.DBscanCluster(k, points[filter]))
+	    temp_cl.append(points[filter])
+    
+    cluster_queue.put(temp_cl)
 
 
 
