@@ -244,7 +244,7 @@ def overlap_trace(clusters_msg):
             max_cls = len(results)
 
 
-        #Sort our data based on their cluster.
+        #TODO Sort our data based on their cluster.
         #print '-----------------'
         #print 'trace results = ' , trace_results
         #for k in range(0, len(trace_results)):
