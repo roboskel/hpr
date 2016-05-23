@@ -21,7 +21,7 @@ class DBscanCluster:
 
     #add a new point to this cluster
     def addPoint(self, new_point):
-	self.points.append(new_point)
+	np.append(self.points, new_point)
 	self._computeMedian()
 	self.numPts = self.numPts + 1
 
@@ -42,3 +42,12 @@ class DBscanCluster:
 
     def getPoints(self):
 	return self.points
+
+    #add to the current cluster new points and update the median core
+    #outlier: <DBscanCluster> instance. Represents an 'outlier cluster'
+    def concat(self, outlier):
+	self.points = np.concatenate((self.points, outlier.getPoints()), axis=0)
+	self.numPts = self.numPts + outlier.getNumPts()
+	self._computeMedian()
+
+

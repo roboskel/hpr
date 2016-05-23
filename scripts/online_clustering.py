@@ -11,64 +11,88 @@ cluster_queue =  Queue.Queue(5)		#maximum size of the queue: 5 timewindows
 Eps = 0.5 #default
 
 
-def onlineDBscan(points, minPts):
+def onlineMedianDBscan(points, minPts):
     global prev_clusters, cluster_label
     global Eps
     temp_outliers = [] 	#a temp list to put noise data that may be part of a cluster in the future
 
     [m,n] = points.shape
     max_id = int(np.amax(cluster_label))
+    point_id = 0
 
     for p in range(0, m-1):
 	dist_array = np.zeros(len(prev_clusters))
 
 	for i in range(0, len(prev_clusters)):
-	    #get the euclidean distance of the point and of the median core of each cluster
+	    D = dist(points[p], prev_clusters[i].getPoints())
+	    #the point is connected with core points of a cluster -> put the point to this cluster 
+	    if (len(np.where(D<=Eps)[0]) +1 ) >= minPts:
+		prev_clusters[i]
+		
+	    #get the euclidean distance of the point and of each cluster
 	    dist_array[i] = distance.euclidean(prev_clusters[i].getMedian(), points[p])	
 
 	min_dist = np.amin(dist_array)
 
 	border, min_index = existMinDistance(temp_outliers, points[p], min_dist)
 
-	#the minimum distance is from an already formed cluster
+	#the minimum distance is arriving from an already formed cluster
 	if min_index == -1:
-	    min_index = dist_array.index(min_dist)
+	    min_index = np.where(dist_array==min_dist)[0]
 	    K = prev_clusters[min_index]
 
 	    #condition where the point belongs to this cluster
-	    if dist(points[p], K.getPoints()) <= Eps:
+	    if (distance.euclidean(points[p], K.getMedian()) <= Eps):
 	    	K.addPoint(points[p])
+		point_id = K.getId()
 	    else:
-		temp_outliers.append(cl.DBscanCluster(++max_id, points[p]))
+		temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+		point_id = max_id
 
 	else:
+	    potential_cl = temp_outliers[min_index]    #a potential new formed cluster that until now is declared as outlier
 
-	    #this point is a border of this cluster but is reachable-connected with a noise point too
+	    #this point is a border of an already formed cluster but it is reachable-connected with a noise point too
 	    if border:
-		pot_index = dist_array.index(min_dist)
-	    	#TODO
 		#update the outlier cluster with the point
+		potential_cl.addPoint(points[p])
+
 		#concatenate the two clusters to one -> concatenate() in my_cluster.py
+		cl_index = np.where(dist_array==min_dist)[0]
+		K = prev_clusters[cl_index]
+		K.concat(potential_cl)
+		point_id = K.getId()
+
 		#remove the outlier cluster from the temp list
+		del temp_outliers[min_index]
+
 	    else:
-		potential_cl = temp_outliers[min_index]
+
 		#it forms a new cluster 
 		#	-> put the new point and update the respective cluster arrays
-		if ( (dist(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 >= minPts) ):
+		if ( (distance.euclidean(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 >= minPts) ):
 		    potential_cl.addPoint(points[p])
 		    prev_clusters.append(potential_cl)
 		    del temp_outliers[min_index]
 
-		#this point belongs to the outlier cluster but a cluster is not formed yet
-		elif ( (dist(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 < minPts) ):
+		    point_id = potential_cl.getId()
+
+		#this point belongs to an 'outlier cluster' but a cluster is not formed yet
+		elif ( (distance.euclidean(points[p], potential_cl.getMedian()) <= Eps) & (potential_cl.getMinPts() +1 < minPts) ):
 		    potential_cl.addPoint(points[p])
+		    point_id = potential_cl.getId()
 
 		else:
 		    # new outlier
-		    if (dist(points[p], potential_cl.getMedian()) > Eps):
-			temp_outliers.append(cl.DBscanCluster(++max_id, points[p]))
+		    if (distance.euclidean(points[p], potential_cl.getMedian()) > Eps):
+			temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+			point_id = max_id
 		
-    #TODO: update the cluster_label
+    	    #append the new point into the cluster_label
+	    np.append(cluster_label, point_id)
+
+	#TODO: update the queue (remove/add new timewindow in the queue) and update the cluster labels and prev_clusters
+
     return cluster_label
 
 
@@ -95,6 +119,125 @@ def existMinDistance(outliers, point, min_dist):
 
 
     return flag, index
+
+
+def onlineDBscan(points, minPts):
+    global prev_clusters, cluster_label
+    global Eps
+    temp_outliers = [] 	#a temp list to put noise data that may be part of a cluster in the future
+
+    [m,n] = points.shape
+    max_id = int(np.amax(cluster_label))
+    point_id = 0
+
+    for p in range(0, m-1):
+
+	for i in range(0, len(prev_clusters)):
+	    D = dist(points[p], prev_clusters[i].getPoints())
+	    neighbors = np.where(D<=Eps)[0]
+
+	    #the point is connected with core points of a cluster -> put the point to this cluster 
+	    if (len(neighbors) >= minPts):
+		prev_clusters[i].addPoint(points[p])
+		point_id = prev_clusters[i].getId()
+		break
+
+	    elif (len(neighbors) == 0):
+		continue
+
+	    #the point's neighbors are borders of this cluster
+	    else:
+		min_dist = np.amin(D)
+		min_index, Dout = existMinNoise(temp_outliers, points[p], min_dist) #min_index defines the index that the closest outlier cluster belongs
+	
+		#IS IT OK??? 
+		#the point will be added as noise bc it is close but the num of neighbors is < minPts
+		if min_index == -1:
+		    temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+		    point_id = max_id
+		    break
+		else:
+		    out_dist = np.amin(Dout)
+		    out_index = np.where(Dout<=Eps)[0] 
+		
+		    #add the point to the 'outlier cluster'
+		    #define it as new cluster
+		    #concat it with the formed cluster
+		    if len(out_index) + 1 >= minPts:
+			potential_cl = temp_outliers[min_index]
+ 			potential_cl.addPoint(points[p])
+
+			prev_clusters[i].concat(potential_cl)
+			del temp_outliers[min_index]
+			   
+			point_id = prev_clusters[i].getId()
+			break
+
+		    else:
+		    	#the point is closer to the 'outlier cluster' and belongs to it
+		    	if out_dist < min_dist:
+			    temp_outliers[min_index].addPoint(points[p])
+			    point_id = temp_outliers[min_index].getId()
+			    break
+
+		        #the point is closer to the border point of a formed cluster
+		    	else:
+			    prev_clusters[i].addPoint(points[p])
+			    point_id = prev_clusters[i].getId()
+			    break
+		
+	#the point does not much in a cluster
+	if point_id == 0:
+	    min_index, Dout = existMinNoise(temp_outliers, points[p])
+
+	    #it is a noise point
+	    if min_index == -1:
+		temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+		point_id = max_id
+		break
+
+	    else:
+		out_index = np.where(Dout<=Eps)[0] 
+		if len(out_index) + 1 >= minPts:
+		    potential_cl = temp_outliers[min_index]
+ 		    potential_cl.addPoint(points[p])
+
+		    point_id = potential_cl.getId()
+		    prev_clusters.append(potential_cl)
+		    del temp_outliers[min_index]
+			   
+		    break
+
+    	#append the new point into the cluster_label
+	np.append(cluster_label, point_id)
+
+	#TODO: update the queue (remove/add new timewindow in the queue) and update the cluster labels and prev_clusters
+
+    return cluster_label
+
+
+# It checks whether the point is closer to an 'outlier cluster'.
+#
+# Return Values:
+#	- min_index: defines the index of the outlier cluster
+#	- Dout: declares the distances of the point with the noise points of the outlier cluster
+def existMinNoise(outliers, point, min_dist = Eps):
+    index = -1
+    Dout = []
+
+    for i in range(0,len(outliers)):
+	D = dist(point, outliers[i].getPoints)
+
+	temp_d = np.amin(D)
+	# there is a minimum distance in the outliers
+	if  temp_d < min_dist:
+	    min_dist = temp_d
+	    index = i
+	    Dout = D
+ 
+
+    return index, Dout
+
 
 
 def epsilon(x,k):
