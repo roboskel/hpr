@@ -43,10 +43,15 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>roslib</build_depend>
   <build_depend>sensor_msgs</build_depend>
-  
+  <build_depend>message_generation</build_depend>
+  <build_depend>laser_wall_extraction</build_depend>
+  <build_depend>laser_clustering</build_depend>
+
+  <run_depend>laser_wall_extraction</run_depend>
+  <run_depend>laser_clustering</run_depend>
+  <run_depend>message_generation</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>roslib</run_depend>
-  <run_depend>boost</run_depend>
   <run_depend>std_msgs</run_depend>
 
 

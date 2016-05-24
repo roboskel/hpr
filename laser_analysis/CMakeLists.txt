@@ -10,9 +10,22 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   std_msgs
   sensor_msgs
+  message_generation
 )
 
 find_package(Boost 1.40 COMPONENTS program_options REQUIRED)
+
+
+add_message_files(
+  FILES
+  Analysis4MetersMsg.msg
+)
+
+generate_messages(
+	DEPENDENCIES
+  sensor_msgs
+	std_msgs
+)
 
 catkin_package(
    	LIBRARIES ${PROJECT_NAME}

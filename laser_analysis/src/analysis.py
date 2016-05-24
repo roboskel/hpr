@@ -6,31 +6,40 @@ import skimage #skimage library has been slightly customized (_hog.py)
 import pickle
 from skimage.feature import hog
 from laser_clustering.msg import ClustersMsg
+from laser_analysis.msg import Analysis4MetersMsg
 import rospkg
 
 z = 0
 dt = 25;#period in ms (dt between scans)
-speed = 5;#human walking speed in km/h
-z_scale = float(speed*dt) / float(3600)
+speed_ = 5;#human walking speed in km/h
+z_scale = float(speed_*dt) / float(3600)
 LDA_classifier = None
+results4meters_publisher = None
+scan_parts = 5
+publish_viz = False
+viz_publisher = None
 
 def init():
-    global clusters_publisher, frame_id, LDA_classifier
+    global results4meters_publisher, frame_id, LDA_classifier, publish_viz, viz_publisher
 
     input_clusters_topic = rospy.get_param('~input_clusters_topic','laser_clustering/clusters')
-    output_clusters_topic = rospy.get_param('~output_clusters_topic','~clusters')
+    results4meters_topic = rospy.get_param('~results4meters_topic','~results4meters')
     frame_id = rospy.get_param('~frame_id','laser_link')
+    classifier_file = rospy.get_param('~classifier_file','LDA_classifier.p')
+    publish_viz = rospy.get_param('~publish_viz', False)
+    viz_topic = rospy.get_param('~viz_topic', "~viz_req")
 
     rospy.init_node('laser_analysis')
 
     rospack = rospkg.RosPack()
 
-    classifier_path = rospack.get_path('laser_analysis')+'/classification_files/LDA_classifier.p'
+    classifier_path = rospack.get_path('laser_analysis')+'/classification_files/'+classifier_file
     LDA_classifier = pickle.load(open(classifier_path, "rb"))
 
     rospy.Subscriber(input_clusters_topic, ClustersMsg, analysis)
 
-    clusters_publisher = rospy.Publisher(output_clusters_topic, ClustersMsg, queue_size=10)
+    results4meters_publisher = rospy.Publisher(results4meters_topic, Analysis4MetersMsg, queue_size=10)
+    viz_publisher = rospy.Publisher(viz_topic, TODO, queue_size=10)
     while not rospy.is_shutdown():
         rospy.spin()
 
@@ -44,7 +53,7 @@ def analysis(clusters_msg):
 
     global z, z_scale
     global all_clusters, all_hogs, all_gridfit, all_orthogonal
-    global tot_results, all_annotations
+    global frame_id, publish_viz
 
     all_clusters = []
     all_hogs = []
@@ -110,7 +119,53 @@ def analysis(clusters_msg):
             all_hogs.append(f)
             hogs.append(f)  #extract hog features
 
-        update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
+        #update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
+        temp = []
+        store_results = []
+        centerx = []
+        centery = []
+        centerz = []
+
+
+        if valid_flag==1:
+            if np.array(hogs).shape==(1,36):
+                temp = np.array(hogs)[0]
+
+            else:
+                for i in range(0,len(hogs)):
+                    temp.append(np.array(hogs[i]))
+
+
+            results = LDA_classifier.predict(temp)
+            print results
+            cnt=0
+            col_list=[]
+
+
+            for k in vcl:
+
+                filter=np.where(cluster_labels==k)
+
+                [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
+
+                [xc,yc,zc] = [align_cl[cnt][0], align_cl[cnt][1], align_cl[cnt][2]]
+
+
+                if len(xc)==0:
+                    print 'out of data'
+                    continue
+
+                cnt=cnt+1
+
+            hogs_temp = np.array(np.array(temp))
+
+            analysis4meters_msg = Analysis4MetersMsg()
+            analysis4meters_msg.header.stamp = rospy.Time.now()
+            analysis4meters_msg.header.frame_id = frame_id
+            #TODO add speed here
+
+            if publish_viz:
+                #TODO publish required arrays
 
 
 #calculates the speed of the first 25 frames (for each cluster), i.e the m/sec that the human walk for each scan.
@@ -165,52 +220,6 @@ def speed(x, y, z) :
     scan_speed = d/(z_angle - z[0])
 
     tot_speed.append(scan_speed)
-
-
-def update_plots(flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids):
-
-    global wall_cart, LDA_classifier, hogs_temp, align_plot, top_view_figure
-    global first_time_annotations, all_annotations
-    global tot_results, metrics, first_time_results
-
-    temp = []
-    store_results = []
-    centerx = []
-    centery = []
-    centerz = []
-
-
-    if flag==1:
-        if np.array(hogs).shape==(1,36):
-            temp = np.array(hogs)[0]
-
-        else:
-            for i in range(0,len(hogs)):
-                temp.append(np.array(hogs[i]))
-
-
-        results = LDA_classifier.predict(temp)
-        print results
-        cnt=0
-        col_list=[]
-
-
-        for k in vcl:
-
-            filter=np.where(cluster_labels==k)
-
-            [x,y,zed] = [xi[filter] , yi[filter] , zi[filter]]
-
-            [xc,yc,zc] = [align_cl[cnt][0], align_cl[cnt][1], align_cl[cnt][2]]
-
-
-            if len(xc)==0:
-                print 'out of data'
-                continue
-
-            cnt=cnt+1
-
-    hogs_temp = np.array(np.array(temp))
 
 
 def translate_cluster(x, y, z) :
