@@ -8,12 +8,21 @@ trace_array = []
 trace_count = False
 trace_results = []
 cls_results = []
+#traced_clusters attribute: is used to store the points of the traced clusters in a slide window manner
+# -> format: [ CL1=[[pTW1], [pTW2], ...] ,CL2=[[pTW1],[pTW2],...] , ... ]
+#    where 
+#	- CLn: indicates a cluster in the slide window
+#	- pTWn: indicates the points of the specific cluster in the timewindow n (TWn)
+#Therefore CL1, which represents cluster 1, is a list of points for <max_num_slide_window> timewindow
 traced_clusters = []
 max_cls = 0
+max_num_slide_window = 4
 first_trace = True
-track_parts = 4
 clusters_publisher = None
 frame_id = ''
+dt = 25;#period in ms (dt between scans)
+speed_ = 5;#human walking speed in km/h
+z_scale = float(speed_*dt) / float(3600)
 
 #TODO delete data after 2*timewindow time of not receiving data
 #del trace_results[:]
@@ -103,7 +112,7 @@ def continue_trace():
 #	b) the value at each index denotes the number of a previous cluster that most likely fits
 def overlap_trace(clusters_msg):
     global trace_array  #the centroid point of each cluster at every scan
-    global trace_count, track_parts
+    global trace_count, max_num_slide_window
 
     global trace_results  #the position of the clusters at each scan
     global cls_results   #the set of points of each cluster at every scan
@@ -117,7 +126,7 @@ def overlap_trace(clusters_msg):
     index = 0
     list_dist = []
     temp_list = []
-    flag = True
+    new_cluster = True
 
     xi = np.array(clusters_msg.x)
     yi = np.array(clusters_msg.y)
@@ -133,7 +142,7 @@ def overlap_trace(clusters_msg):
             [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
             cls.append([xk,yk,zk])
 
-
+    
     if len(trace_array) == 0:
         for i in range(0, len(cls)):
             trace_array.append(get_centroid(cls[i], False))
@@ -149,19 +158,19 @@ def overlap_trace(clusters_msg):
         if len(cls) > len(trace_array):
             first = trace_array
             second = cls
-            flag = True
+            new_cluster = True
         else:
             first = cls
             second = trace_array
-            flag = False
+            new_cluster = False
 
         for i in range(0, len(first)):
-            if flag == False:
+            if new_cluster == False:
                 coord = get_centroid(first[i], True)
 
             for j in range(0, len(second)):
             #eucl_dist for every combination
-                if flag:
+                if new_cluster:
                     coord = get_centroid(second[j], True)
                     d = dist.euclidean(coord,first[i])
                     temp_list.append(d)
@@ -201,7 +210,7 @@ def overlap_trace(clusters_msg):
                     row = i
                     break
 
-            if flag:
+            if new_cluster:
                 results[list_dist[row].index(min_val)] = row
 
             else:
@@ -217,8 +226,7 @@ def overlap_trace(clusters_msg):
             col = -1
             row =0
             min_val = -1.0
-
-        #print 'results = ' , results
+	
 
         # a cluster disappears
         if len(results) < len(trace_array) and len(traced_clusters) != 0:
@@ -239,10 +247,11 @@ def overlap_trace(clusters_msg):
         trace_results.append(results)
         cls_results.append(cls)
 
+	#print 'trace_results ', trace_results
         #the maximum number of clusters
         if max_cls < len(results):
             max_cls = len(results)
-
+	
 
         #TODO Sort our data based on their cluster.
         #print '-----------------'
@@ -262,15 +271,55 @@ def overlap_trace(clusters_msg):
         cls_msg.z = clusters_msg.z
         clusters_publisher.publish(cls_msg)
 
-        if len(trace_results) == track_parts:
+        if len(trace_results) == max_num_slide_window:
             if first_trace:
                 create_trace()
                 first_trace = False
             else:
                 continue_trace()
-            del trace_results[0]
+
+            final_clusters = getClusterSet()  
+
+	    del trace_results[0]
             del cls_results[0]
             max_cls = len(results)
+
+
+#combines the points of each tracked cluster.
+#returns a list of the trackedCluster points
+def getClusterSet():
+    global traced_clusters
+    global z_scale
+
+    final_clusters = []
+
+    #for every tracked cluster
+    for i in range(0, len(traced_clusters)):
+        if len(traced_clusters[i]) == 0:
+             continue
+
+	#initialize x,y,z of trackedCluster_i
+        xar = np.array(traced_clusters[i][0][0])
+        yar = np.array(traced_clusters[i][0][1])
+        zar = np.array(traced_clusters[i][0][2])
+
+        #z dimension changes: 
+        #Each timewindow resets the time, thus the time (z dimention) begins from 0.0.
+        #In order to combine the points of the available timewindows, the time should increment periodically in each set of timewindow points.
+	for j in range(1, len(traced_clusters[i])):
+             xar = np.append(xar,traced_clusters[i][j][0])
+             yar = np.append(yar,traced_clusters[i][j][1])
+             B = traced_clusters[i][j][2].copy()
+
+             increment = zar[len(zar) - 1] + z_scale
+             B[::1]  += increment
+             zar =  np.append(zar,B)	
+
+        final_clusters.append([xar,yar,zar])
+
+    return final_clusters
+
+
 
 if __name__ == '__main__':
     init() 
