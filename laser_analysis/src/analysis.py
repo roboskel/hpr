@@ -90,8 +90,6 @@ def analysis(clusters_msg):
             zk.append(zi[j])
         prev_index = array_sizes[i] - 1
 
-        print [xk,yk,zk]
-
         #speed(xk,yk,zk)
         trans_matrix =[[xk,yk,zk]]
 

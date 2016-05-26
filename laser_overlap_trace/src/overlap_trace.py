@@ -24,14 +24,6 @@ dt = 25;#period in ms (dt between scans)
 speed_ = 5;#human walking speed in km/h
 z_scale = float(speed_*dt) / float(3600)
 
-#TODO delete data after 2*timewindow time of not receiving data
-#del trace_results[:]
-#del cls_results[:]
-#del traced_clusters[:]
-#first_trace = True
-#trace_count = False
-#max_cls =0
-
 
 def init():
     global clusters_publisher, frame_id, dt, speed_, z_scale
@@ -140,159 +132,165 @@ def overlap_trace(clusters_msg):
 
     prev_index = 0
 
-    for i in range(0, len(array_sizes)):
-        xk = []
-        yk = []
-        zk = []
-        for j in range(prev_index, prev_index+array_sizes[i]-1):
-            xk.append(xi[j])
-            yk.append(yi[j])
-            zk.append(zi[j])
-        cls.append([np.array(xk), np.array(yk), np.array(zk)])
-        prev_index = array_sizes[i]-1
+    if(len(array_sizes) > 0):
 
-    if len(trace_array) == 0:
-        for i in range(0, len(cls)):
-            trace_array.append(get_centroid(cls[i], False))
-            trace_results.append([i])
-            cls_results.append([cls[i]])
-    else:
-        #condition where the clusters have been reduced
-        if trace_count:
-            traced_clusters2 = [x for x in traced_clusters if x != []]
-            traced_clusters = list(traced_clusters2)
-            trace_count = False
+        for i in range(0, len(array_sizes)):
+            xk = []
+            yk = []
+            zk = []
+            for j in range(prev_index, prev_index+array_sizes[i]-1):
+                xk.append(xi[j])
+                yk.append(yi[j])
+                zk.append(zi[j])
+            cls.append([np.array(xk), np.array(yk), np.array(zk)])
+            prev_index = array_sizes[i]-1
 
-        if len(cls) > len(trace_array):
-            first = trace_array
-            second = cls
-            new_cluster = True
+        if len(trace_array) == 0:
+            for i in range(0, len(cls)):
+                trace_array.append(get_centroid(cls[i], False))
+                trace_results.append([i])
+                cls_results.append([cls[i]])
         else:
-            first = cls
-            second = trace_array
-            new_cluster = False
+            #condition where the clusters have been reduced
+            if trace_count:
+                traced_clusters2 = [x for x in traced_clusters if x != []]
+                traced_clusters = list(traced_clusters2)
+                trace_count = False
 
-        for i in range(0, len(first)):
-            if new_cluster == False:
-                coord = get_centroid(first[i], True)
+            if len(cls) > len(trace_array):
+                first = trace_array
+                second = cls
+                new_cluster = True
+            else:
+                first = cls
+                second = trace_array
+                new_cluster = False
 
-            for j in range(0, len(second)):
-            #eucl_dist for every combination
-                if new_cluster:
-                    coord = get_centroid(second[j], True)
-                    d = dist.euclidean(coord,first[i])
-                    temp_list.append(d)
-                else:
-                    d = dist.euclidean(coord,second[j])
-                    temp_list.append(d)
+            for i in range(0, len(first)):
+                if new_cluster == False:
+                    coord = get_centroid(first[i], True)
 
-            list_dist.append(temp_list)
+                for j in range(0, len(second)):
+                #eucl_dist for every combination
+                    if new_cluster:
+                        coord = get_centroid(second[j], True)
+                        d = dist.euclidean(coord,first[i])
+                        temp_list.append(d)
+                    else:
+                        d = dist.euclidean(coord,second[j])
+                        temp_list.append(d)
 
-            temp_list = []
+                list_dist.append(temp_list)
 
-        min_val = -1.0
-        row = 0
-        num = 0
-        temp_num = 0
-        col = -1
-        results = []
+                temp_list = []
 
-        temp_list = list(list_dist)
-        length = len(list_dist)
+            min_val = -1.0
+            row = 0
+            num = 0
+            temp_num = 0
+            col = -1
+            results = []
 
-        for i in range(0,len(cls)):
-            results.append(-1)
+            temp_list = list(list_dist)
+            length = len(list_dist)
 
-        while num<length:
-            for i in range(0, len(temp_list)):
-                if min_val == -1.0:
-                    min_val = min(temp_list[i])
-                    temp_row = i
-                else:
-                    if min_val > min(temp_list[i]):
+            for i in range(0,len(cls)):
+                results.append(-1)
+
+            while num<length:
+                for i in range(0, len(temp_list)):
+                    if min_val == -1.0:
                         min_val = min(temp_list[i])
                         temp_row = i
+                    else:
+                        if min_val > min(temp_list[i]):
+                            min_val = min(temp_list[i])
+                            temp_row = i
 
-            for i in range(0, len(list_dist)):
-                if min_val in list_dist[i]:
-                    row = i
-                    break
+                for i in range(0, len(list_dist)):
+                    if min_val in list_dist[i]:
+                        row = i
+                        break
 
-            if new_cluster:
-                results[list_dist[row].index(min_val)] = row
+                if new_cluster:
+                    results[list_dist[row].index(min_val)] = row
 
-            else:
-                results[row] = list_dist[row].index(min_val)
+                else:
+                    results[row] = list_dist[row].index(min_val)
 
-            ind = temp_list[temp_row].index(min_val)
-            del temp_list[temp_row]
+                ind = temp_list[temp_row].index(min_val)
+                del temp_list[temp_row]
 
-            for i in range(0, len(temp_list)):
-                temp_list[i][ind] = error
+                for i in range(0, len(temp_list)):
+                    temp_list[i][ind] = error
 
-            num = num + 1
-            col = -1
-            row =0
-            min_val = -1.0
-	
+                num = num + 1
+                col = -1
+                row =0
+                min_val = -1.0
 
-        # a cluster disappears
-        if len(results) < len(trace_array) and len(traced_clusters) != 0:
-            rm_list = []
-            #remove the unnecessary clusters
-            for j in range(0, len(trace_array)):
-                if j not in results:
-                    rm_list.append(j)
-            for i in range(0, len(rm_list)):
-                del traced_clusters[rm_list[i]][:]
-                trace_count = True
+            # a cluster disappears
+            if len(results) < len(trace_array) and len(traced_clusters) != 0:
+                rm_list = []
+                #remove the unnecessary clusters
+                for j in range(0, len(trace_array)):
+                    if j not in results:
+                        rm_list.append(j)
+                for i in range(0, len(rm_list)):
+                    del traced_clusters[rm_list[i]][:]
+                    trace_count = True
 
-        #remove previous and add the new ones
-        del trace_array[:]
-        for i in range(0, len(cls)):
-            trace_array.append(get_centroid(cls[i], False))
+            #remove previous and add the new ones
+            del trace_array[:]
+            for i in range(0, len(cls)):
+                trace_array.append(get_centroid(cls[i], False))
 
-        trace_results.append(results)
-        cls_results.append(cls)
+            trace_results.append(results)
+            cls_results.append(cls)
 
-	#print 'trace_results ', trace_results
-        #the maximum number of clusters
-        if max_cls < len(results):
-            max_cls = len(results)
+            #the maximum number of clusters
+            if max_cls < len(results):
+                max_cls = len(results)
 
-        if len(trace_results) == max_num_slide_window:
-            if first_trace:
-                create_trace()
-                first_trace = False
-            else:
-                continue_trace()
+            if len(trace_results) == max_num_slide_window:
+                if first_trace:
+                    create_trace()
+                    first_trace = False
+                else:
+                    continue_trace()
 
-            final_clusters = getClusterSet()
-            x_ = []
-            y_ = []
-            z_ = []
-            arr_sz = []
-            for i in range(0, len(final_clusters)):
-                sz = len(final_clusters[i][0])
-                arr_sz.append(sz)
-                for j in range(0, sz):
-	                x_.append(final_clusters[i][0][j])
-	                y_.append(final_clusters[i][1][j])
-	                z_.append(final_clusters[i][2][j])
+                final_clusters = getClusterSet()
+                x_ = []
+                y_ = []
+                z_ = []
+                arr_sz = []
+                for i in range(0, len(final_clusters)):
+                    sz = len(final_clusters[i][0])
+                    arr_sz.append(sz)
+                    for j in range(0, sz):
+                        x_.append(final_clusters[i][0][j])
+                        y_.append(final_clusters[i][1][j])
+                        z_.append(final_clusters[i][2][j])
 
-            #TODO PLACEHOLDER FOR REAL MESSAGE INFO
-            cls_msg = ClustersMsg()
-            cls_msg.header.stamp = rospy.Time.now()
-            cls_msg.header.frame_id = frame_id
-            cls_msg.x = x_
-            cls_msg.y = y_
-            cls_msg.z = z_
-            cls_msg.array_sizes = arr_sz
-            clusters_publisher.publish(cls_msg)
+                cls_msg = ClustersMsg()
+                cls_msg.header.stamp = rospy.Time.now()
+                cls_msg.header.frame_id = frame_id
+                cls_msg.x = x_
+                cls_msg.y = y_
+                cls_msg.z = z_
+                cls_msg.array_sizes = arr_sz
+                clusters_publisher.publish(cls_msg)
 
-            del trace_results[0]
-            del cls_results[0]
-            max_cls = len(results)
+                del trace_results[0]
+                del cls_results[0]
+                max_cls = len(results)
+    else:
+        del trace_results[:]
+        del cls_results[:]
+        del traced_clusters[:]
+        first_trace = True
+        trace_count = False
+        max_cls =0
 
 
 #combines the points of each tracked cluster.
