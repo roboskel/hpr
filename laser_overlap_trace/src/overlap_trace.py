@@ -34,13 +34,17 @@ z_scale = float(speed_*dt) / float(3600)
 
 
 def init():
-    global clusters_publisher, frame_id
+    global clusters_publisher, frame_id, dt, speed_, z_scale
+
+    rospy.init_node('laser_overlap_trace')
 
     input_clusters_topic = rospy.get_param('~input_clusters_topic','laser_clustering/clusters')
     output_clusters_topic = rospy.get_param('~output_clusters_topic','~clusters')
     frame_id = rospy.get_param('~frame_id','laser_link')
+    dt = rospy.get_param('~dt', 25)
+    speed_ = rospy.get_param('~human_speed', 5)
 
-    rospy.init_node('laser_overlap_trace')
+    z_scale = float(speed_*dt) / float(3600)
    
     rospy.Subscriber(input_clusters_topic, ClustersMsg, overlap_trace)
 
@@ -132,17 +136,21 @@ def overlap_trace(clusters_msg):
     yi = np.array(clusters_msg.y)
     zi = np.array(clusters_msg.z)
 
-    cluster_labels = np.array(clusters_msg.clusters)
+    array_sizes = np.array(clusters_msg.array_sizes)
 
-    max_label=int(np.amax(cluster_labels))
+    prev_index = 0
 
-    for k in range(1,max_label+1) :
-        filter = np.where(cluster_labels==k)
-        if len(filter[0])>40 :
-            [xk,yk,zk]=[xi[filter],yi[filter],zi[filter]]
-            cls.append([xk,yk,zk])
+    for i in range(0, len(array_sizes)):
+        xk = []
+        yk = []
+        zk = []
+        for j in range(prev_index, prev_index+array_sizes[i]-1):
+            xk.append(xi[j])
+            yk.append(yi[j])
+            zk.append(zi[j])
+        cls.append([np.array(xk), np.array(yk), np.array(zk)])
+        prev_index = array_sizes[i]-1
 
-    
     if len(trace_array) == 0:
         for i in range(0, len(cls)):
             trace_array.append(get_centroid(cls[i], False))
@@ -251,25 +259,6 @@ def overlap_trace(clusters_msg):
         #the maximum number of clusters
         if max_cls < len(results):
             max_cls = len(results)
-	
-
-        #TODO Sort our data based on their cluster.
-        #print '-----------------'
-        #print 'trace results = ' , trace_results
-        #for k in range(0, len(trace_results)):
-            #trace_results[k] = np.sort(trace_results[k])
-        #print 'trace results = ' , trace_results
-        #print '-----------------'
-
-        #PLACEHOLDER FOR REAL MESSAGE INFO
-        cls_msg = ClustersMsg()
-        cls_msg.header.stamp = rospy.Time.now()
-        cls_msg.header.frame_id = frame_id
-        cls_msg.clusters = clusters_msg.clusters
-        cls_msg.x = clusters_msg.x
-        cls_msg.y = clusters_msg.y
-        cls_msg.z = clusters_msg.z
-        clusters_publisher.publish(cls_msg)
 
         if len(trace_results) == max_num_slide_window:
             if first_trace:
@@ -278,9 +267,30 @@ def overlap_trace(clusters_msg):
             else:
                 continue_trace()
 
-            final_clusters = getClusterSet()  
+            final_clusters = getClusterSet()
+            x_ = []
+            y_ = []
+            z_ = []
+            arr_sz = []
+            for i in range(0, len(final_clusters)):
+                sz = len(final_clusters[i][0])
+                arr_sz.append(sz)
+                for j in range(0, sz):
+	                x_.append(final_clusters[i][0][j])
+	                y_.append(final_clusters[i][1][j])
+	                z_.append(final_clusters[i][2][j])
 
-	    del trace_results[0]
+            #TODO PLACEHOLDER FOR REAL MESSAGE INFO
+            cls_msg = ClustersMsg()
+            cls_msg.header.stamp = rospy.Time.now()
+            cls_msg.header.frame_id = frame_id
+            cls_msg.x = x_
+            cls_msg.y = y_
+            cls_msg.z = z_
+            cls_msg.array_sizes = arr_sz
+            clusters_publisher.publish(cls_msg)
+
+            del trace_results[0]
             del cls_results[0]
             max_cls = len(results)
 
@@ -298,7 +308,7 @@ def getClusterSet():
         if len(traced_clusters[i]) == 0:
              continue
 
-	#initialize x,y,z of trackedCluster_i
+        #initialize x,y,z of trackedCluster_i
         xar = np.array(traced_clusters[i][0][0])
         yar = np.array(traced_clusters[i][0][1])
         zar = np.array(traced_clusters[i][0][2])
@@ -306,7 +316,7 @@ def getClusterSet():
         #z dimension changes: 
         #Each timewindow resets the time, thus the time (z dimention) begins from 0.0.
         #In order to combine the points of the available timewindows, the time should increment periodically in each set of timewindow points.
-	for j in range(1, len(traced_clusters[i])):
+        for j in range(1, len(traced_clusters[i])):
              xar = np.append(xar,traced_clusters[i][j][0])
              yar = np.append(yar,traced_clusters[i][j][1])
              B = traced_clusters[i][j][2].copy()

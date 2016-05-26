@@ -1,2 +1,2 @@
 Header header
-string time_needed
+float32 time_needed

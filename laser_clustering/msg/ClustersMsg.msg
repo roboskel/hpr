@@ -1,5 +1,5 @@
 Header header
-float32[] clusters
 float32[] x
 float32[] y
 float32[] z
+int32[] array_sizes

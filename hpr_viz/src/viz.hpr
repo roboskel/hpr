@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+import roslib, rospy
+import numpy as np
+import matplotlib.pyplot as plt
+
+num_of_diagrams = 2
+pause_function = False
+stdscr = None
+
+def init():
+    global num_of_diagrams, pause_function
+
+    rospy.init_node('hpr_viz')
+
+    input_topic = rospy.get_param('~input_topic','laser_analysis/viz_req')
+    num_of_diagrams = rospy.get_param('~num_of_diagrams',2)
+    pause_function = rospy.get_param('~num_of_diagrams',False)
+   
+    rospy.Subscriber(input_topic, BufferMsg, clustering_procedure)
+
+    clusters_publisher = rospy.Publisher(clusters_topic, ClustersMsg, queue_size=10)
+    while not rospy.is_shutdown():  
+        rospy.spin()
+
+def update_plots(data):
+    
+
+if __name__ == '__main__':
+    init()   

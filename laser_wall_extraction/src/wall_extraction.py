@@ -25,7 +25,9 @@ frame_id = ''
 
 
 def init():
-    global range_limit, timewindow, use_overlap, buffer_publisher, frame_id
+    global range_limit, timewindow, use_overlap, buffer_publisher, frame_id, dt, speed_, z_scale
+
+    rospy.init_node('laser_wall_extraction')
 
     scan_topic = rospy.get_param('~scan_topic','scan')
     timewindow = rospy.get_param('~timewindow', 40)
@@ -33,8 +35,10 @@ def init():
     use_overlap = rospy.get_param('~use_overlap', True)
     buffer_topic = rospy.get_param('~buffer_topic','~buffer')
     frame_id = rospy.get_param('~frame_id','laser_link')
+    dt = rospy.get_param('~dt', 25)
+    speed_ = rospy.get_param('~human_speed', 5)
 
-    rospy.init_node('laser_wall_extraction')
+    z_scale = float(speed_*dt) / float(3600)
 
     print "Waiting for laser scans ..."
    
@@ -57,7 +61,7 @@ def wall_extraction(laser_data):
                 while  laser_ranges[j] > range_limit:
                         j = j - 1;
                         if j == 0:
-                                break;
+                            break;
                 laser_ranges[i] = laser_ranges[j];
 
 
