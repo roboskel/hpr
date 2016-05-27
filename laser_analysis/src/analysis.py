@@ -7,7 +7,8 @@ import pickle
 from skimage.feature import hog
 from laser_clustering.msg import ClustersMsg
 from laser_analysis.msg import Analysis4MetersMsg
-import rospkg
+import rospkg, math
+import scipy.spatial.distance as dist
 
 z = 0
 dt = 25;#period in ms (dt between scans)
@@ -16,12 +17,23 @@ z_scale = float(speed_*dt) / float(3600)
 LDA_classifier = None
 results4meters_publisher = None
 scan_parts = 5
+timewindow = 40
+distance = 4
 publish_viz = False
 viz_publisher = None
+
+scan_time = 0.0
+prev_median=[]
+medX=[]
+medY=[]
+tot_time=0.0
+tot_dist=0.0
+
 
 def init():
     global results4meters_publisher, frame_id, LDA_classifier, publish_viz, viz_publisher
     global dt, speed_, z_scale
+    global timewindow, distance
 
     rospy.init_node('laser_analysis')
 
@@ -33,6 +45,8 @@ def init():
     viz_topic = rospy.get_param('~viz_topic', "~viz_req")
     dt = rospy.get_param('~dt', 25)
     speed_ = rospy.get_param('~human_speed', 5)
+    timewindow = rospy.get_param('~timewindow', 40)
+    distance = rospy.get_param('~distance', 4)
 
     print input_clusters_topic
 
@@ -64,6 +78,8 @@ def analysis(clusters_msg):
     global z, z_scale
     global all_clusters, all_hogs, all_orthogonal
     global frame_id, publish_viz
+    global seconds,prev_sec
+    global scan_time
 
     all_clusters = []
     all_hogs = []
@@ -74,6 +90,11 @@ def analysis(clusters_msg):
     xi = np.array(clusters_msg.x)
     yi = np.array(clusters_msg.y)
     zi = np.array(clusters_msg.z)
+    
+    if len(xi) != 0:
+        scan_time = clusters_msg.scan_time
+    else:
+        initialize_walk()
 
     array_sizes = np.array(clusters_msg.array_sizes)
     
@@ -89,6 +110,8 @@ def analysis(clusters_msg):
             yk.append(yi[j])
             zk.append(zi[j])
         prev_index = array_sizes[i] - 1
+
+        walk_speed(xk,yk)
 
         #speed(xk,yk,zk)
         trans_matrix =[[xk,yk,zk]]
@@ -151,6 +174,54 @@ def analysis(clusters_msg):
         if publish_viz:
             #TODO publish required arrays
             print 'test'
+
+
+def walk_speed(x, y):
+
+    global tot_time
+    global tot_dist
+    global prev_median, medX, medY
+    global timewindow, scan_time, distance
+
+    parts = 4
+    split = len(x)/parts
+    split_count = 0
+
+    while split_count <= len(x):
+        xmed = np.median(x[split_count:split_count+split])
+        ymed = np.median(y[split_count:split_count+split])
+
+        if ((math.isnan(xmed)) or (math.isnan(ymed))):
+            split_count += split
+            continue
+
+        if len(prev_median) != 0:
+            tot_dist = tot_dist + dist.euclidean([xmed, ymed], prev_median)
+	
+        prev_median = [xmed, ymed]
+        tot_time = tot_time + scan_time*((timewindow-2)/parts)   
+        
+	medX.append(xmed)
+	medY.append(ymed)
+
+        split_count += split
+
+        if tot_dist >= distance:
+            print '\n*****\nHe/She walked {} meters in {} seconds\n*****\n'.format(tot_dist, tot_time)
+            initialize_walk()
+
+
+#initialize the parameters for walk_speed calclulation
+def initialize_walk():
+    global tot_time, tot_dist
+    global medX, medY, prev_median 
+
+    prev_median=[]
+    medX=[]
+    medY=[]
+    tot_time = 0.0
+    tot_dist = 0.0
+
 
 
 #calculates the speed of the first 25 frames (for each cluster), i.e the m/sec that the human walk for each scan.

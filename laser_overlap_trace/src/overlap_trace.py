@@ -128,6 +128,8 @@ def overlap_trace(clusters_msg):
     yi = np.array(clusters_msg.y)
     zi = np.array(clusters_msg.z)
 
+    scan_time = clusters_msg.scan_time
+
     array_sizes = np.array(clusters_msg.array_sizes)
 
     prev_index = 0
@@ -279,6 +281,7 @@ def overlap_trace(clusters_msg):
                 cls_msg.y = y_
                 cls_msg.z = z_
                 cls_msg.array_sizes = arr_sz
+                cls_msg.scan_time = scan_time
                 clusters_publisher.publish(cls_msg)
 
                 del trace_results[0]

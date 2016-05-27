@@ -46,10 +46,13 @@ def clustering_procedure(buffer):
         clustersmsg.x = []
         clustersmsg.y = []
         clustersmsg.z = []
+
         #empty array_sizes means that anyone listening to this message won't loop through the data
         clustersmsg.array_sizes = []
         clusters_publisher.publish(clustersmsg)
     else:
+        scan_time = buffer.scan_time
+
         clear_data = np.zeros((len(buffer.x), 3))
         for i in range(0,len(buffer.x)):
             clear_data[i] = ([buffer.x[i], buffer.y[i], buffer.z[i]])
@@ -83,6 +86,7 @@ def clustering_procedure(buffer):
         clustersmsg.y = y_
         clustersmsg.z = z_
         clustersmsg.array_sizes = arr_sz
+        clustersmsg.scan_time = scan_time
         clusters_publisher.publish(clustersmsg)
 
         if publish_cluster_labels:

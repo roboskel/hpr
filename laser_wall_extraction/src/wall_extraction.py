@@ -150,6 +150,7 @@ def wall_extraction(laser_data):
                     buffmsg.x = mybuffer[:,0]
                     buffmsg.y = mybuffer[:,1]
                     buffmsg.z = mybuffer[:,2]
+                    buffmsg.scan_time = laser_data.scan_time
                     buffer_publisher.publish(buffmsg)
                     #print mybuffer
 

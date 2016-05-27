@@ -6,3 +6,5 @@ publish_viz: False
 viz_topic: "~viz_req"
 dt: 25
 human_speed: 5
+timewindow: 40
+distance: 4	#defined in meters
