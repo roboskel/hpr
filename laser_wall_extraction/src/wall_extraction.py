@@ -160,7 +160,6 @@ def wall_extraction(laser_data):
             fr_index = fr_index + 1
         else:
             buffmsg = BufferMsg()
-            buffmsg.header.stamp = rospy.Time.now()
             buffmsg.header.frame_id = frame_id
             buffmsg.x = []
             buffmsg.y = []

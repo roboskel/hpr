@@ -275,7 +275,6 @@ def overlap_trace(clusters_msg):
                         z_.append(final_clusters[i][2][j])
 
                 cls_msg = ClustersMsg()
-                cls_msg.header.stamp = rospy.Time.now()
                 cls_msg.header.frame_id = frame_id
                 cls_msg.x = x_
                 cls_msg.y = y_
