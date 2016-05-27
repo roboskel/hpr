@@ -101,6 +101,7 @@ def analysis(clusters_msg):
     cnt=0
     prev_index = 0
 
+    print 'len = ',len(array_sizes)
     for i in range(0, len(array_sizes)):
         xk = []
         yk = []

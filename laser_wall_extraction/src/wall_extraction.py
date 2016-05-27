@@ -106,7 +106,7 @@ def wall_extraction(laser_data):
                 vizwvm = WallVizMsg()
                 wvm.x = wall_cart[:,0]
                 wvm.y = wall_cart[:,1]
-                viz_publisher.publish(wvm)_publisher.publish(wall_cart[0])
+                viz_publisher.publish(wvm)
                 
     else:
         #walls are set, process scans
