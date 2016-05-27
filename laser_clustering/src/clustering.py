@@ -79,6 +79,7 @@ def clustering_procedure(buffer):
                 arr_sz.append(len(xk))
 
         clustersmsg = ClustersMsg()
+        clustersmsg.header.stamp = rospy.Time.now()
         clustersmsg.header.frame_id = frame_id
         #clustersmsg.clusters = cluster_labels
         clustersmsg.x = x_

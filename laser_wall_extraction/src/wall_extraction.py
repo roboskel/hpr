@@ -3,7 +3,7 @@ import roslib, rospy
 import numpy as np
 from sensor_msgs.msg import LaserScan
 from laser_wall_extraction.msg import BufferMsg
-from std_msgs.msg import Float32
+from laser_wall_extraction.msg import WallVizMsg
 
 
 wall_flag = 0
@@ -52,7 +52,7 @@ def init():
     buffer_publisher = rospy.Publisher(buffer_topic, BufferMsg, queue_size=10)
     
     if publish_viz:
-        viz_publisher = rospy.Publisher(viz_topic, Float32, queue_size=1)
+        viz_publisher = rospy.Publisher(viz_topic, WallVizMsg, queue_size=1)
 
     while not rospy.is_shutdown():  
         rospy.spin()
@@ -103,8 +103,11 @@ def wall_extraction(laser_data):
             wall_cart = np.array(pol2cart(wall,phi,0)) #convert to Cartesian
             wall_flag = 1
             if publish_viz:
-                print wall_cart[0]
-                viz_publisher.publish(wall_cart[0])
+                vizwvm = WallVizMsg()
+                wvm.x = wall_cart[:,0]
+                wvm.y = wall_cart[:,1]
+                viz_publisher.publish(wvm)_publisher.publish(wall_cart[0])
+                
     else:
         #walls are set, process scans
         ranges = np.array(laser_ranges)[sampling]
@@ -160,6 +163,7 @@ def wall_extraction(laser_data):
             fr_index = fr_index + 1
         else:
             buffmsg = BufferMsg()
+            buffmsg.header.stamp = rospy.Time.now()
             buffmsg.header.frame_id = frame_id
             buffmsg.x = []
             buffmsg.y = []
