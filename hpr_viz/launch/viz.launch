@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<launch>
+	<master auto="start"/>
+
+	<node pkg="hpr_viz" type="viz_hpr.py" respawn="false" name="hpr_viz" output="screen">
+		<rosparam file="$(find hpr_viz)/config/parameters.yaml" command="load" />
+	</node>
+</launch>
