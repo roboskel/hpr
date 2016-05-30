@@ -103,7 +103,8 @@ def plot_walls(wall_data):
     top_view_figure.set_xlabel('Vertical distance')
     top_view_figure.set_ylabel('Robot is here')
     top_view_figure.plot(wall_x, wall_y)
-    plt.pause(0.0001)
+    #plt.pause(0.0001)
+    plt.draw()
 
 def plot_clustering(data):
     global num_of_diagrams, top_view_figure, clusters_plot, wall_x, wall_y, pause, stdscr
@@ -131,7 +132,8 @@ def plot_clustering(data):
             clusters_plot.set_zlabel('Z - Time')
             clusters_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
 
-        plt.pause(0.0001)
+        #plt.pause(0.0000000001)
+        plt.draw()
 
 
 def plot_overlap(data):
@@ -144,7 +146,8 @@ def plot_overlap(data):
         overlap_plot.set_ylabel('Y - Robot')
         overlap_plot.set_zlabel('Z - Time')
         overlap_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
-        plt.pause(0.0001)
+        #plt.pause(0.00000001)
+        plt.draw()
 
 
 if __name__ == '__main__':

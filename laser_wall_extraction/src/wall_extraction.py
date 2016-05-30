@@ -103,7 +103,7 @@ def wall_extraction(laser_data):
             wall_cart = np.array(pol2cart(wall,phi,0)) #convert to Cartesian
             wall_flag = 1
             if publish_viz:
-                vizwvm = WallVizMsg()
+                wvm = WallVizMsg()
                 wvm.x = wall_cart[:,0]
                 wvm.y = wall_cart[:,1]
                 viz_publisher.publish(wvm)

@@ -62,7 +62,8 @@ def init():
     results4meters_publisher = rospy.Publisher(results4meters_topic, Analysis4MetersMsg, queue_size=10)
 
     if publish_viz:
-        viz_publisher = rospy.Publisher(viz_topic, TODO, queue_size=10)
+        print 'todo'
+        #viz_publisher = rospy.Publisher(viz_topic, TODO, queue_size=10)
 
     while not rospy.is_shutdown():
         rospy.spin()

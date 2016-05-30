@@ -3,7 +3,7 @@ input_clusters_topic: "laser_overlap_trace/clusters"
 results4meters_topic: "~results4meters"
 frame_id: "laser_link"
 classifier_file: "LDA_classifier.p" #place the file inside the classification_files folder.
-publish_viz: False
+publish_viz: True
 viz_topic: "~viz_req"
 dt: 25
 human_speed: 5

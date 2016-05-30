@@ -6,5 +6,5 @@ buffer_topic: '~buffer'
 frame_id: 'laser_link'
 dt: 25
 human_speed: 5
-publish_viz: False
+publish_viz: True
 viz_topic: "~viz_req"
