@@ -79,7 +79,6 @@ def create_trace():
         traced_clusters.append(temp)
         temp=[]
 
-
 def continue_trace():
 
     global trace_results, cls_results
@@ -158,7 +157,7 @@ def overlap_trace(clusters_msg):
                 traced_clusters2 = [x for x in traced_clusters if x != []]
                 traced_clusters = list(traced_clusters2)
                 trace_count = False
-
+	
             if len(cls) > len(trace_array):
                 first = trace_array
                 second = cls
@@ -232,7 +231,7 @@ def overlap_trace(clusters_msg):
                 min_val = -1.0
 
             # a cluster disappears
-            if len(results) < len(trace_array) and len(traced_clusters) != 0:
+            if (len(results) < len(trace_array) and len(traced_clusters) != 0):
                 rm_list = []
                 #remove the unnecessary clusters
                 for j in range(0, len(trace_array)):
@@ -291,6 +290,7 @@ def overlap_trace(clusters_msg):
         del trace_results[:]
         del cls_results[:]
         del traced_clusters[:]
+        del trace_array[:]
         first_trace = True
         trace_count = False
         max_cls =0

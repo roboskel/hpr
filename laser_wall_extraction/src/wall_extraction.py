@@ -163,7 +163,6 @@ def wall_extraction(laser_data):
             z = z + z_scale
             fr_index = fr_index + 1
         else:
-            overlap_part = []
             buffmsg = BufferMsg()
             buffmsg.header.stamp = rospy.Time.now()
             buffmsg.header.frame_id = frame_id
