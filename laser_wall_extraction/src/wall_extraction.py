@@ -116,22 +116,23 @@ def wall_extraction(laser_data):
         theta = phi[filter]
 
         if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
+
             C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
-            if (fr_index ==1 ):
+            if (fr_index == 1 ):
                     if (len(overlap_part) == 0 or not use_overlap):
                         mybuffer = C #mybuffer is the cartesian coord of the first scan
-                        mybuffer_tmp = [C]
+                        #mybuffer_tmp = [C]
                     else:
                         mybuffer =  np.concatenate((overlap_part,C), axis=0 )
                         overlap_part = []
-                        mybuffer_tmp = [C]
+                        #mybuffer_tmp = [C]
             else :
                 mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
-                mybuffer_tmp.append((mybuffer_tmp,[C]))
+                #mybuffer_tmp.append((mybuffer_tmp,[C]))
 
                 if(use_overlap):
-                    if((fr_index>=timewindow-1) & (fr_index < timewindow)):
+                    if fr_index == (timewindow-1):
                         if (len(overlap_part) == 0):
                             overlap_part = np.array(pol2cart(ranges,theta,0.0))
                         else:
@@ -146,7 +147,7 @@ def wall_extraction(laser_data):
                 mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
                 mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
 
-                if len(mybuffer>3): #at least 3 points are needed to form a cluster
+                if len(mybuffer > 3): #at least 3 points are needed to form a cluster
                     buffmsg = BufferMsg()
                     buffmsg.header.stamp = rospy.Time.now()
                     buffmsg.header.frame_id = frame_id
@@ -157,11 +158,12 @@ def wall_extraction(laser_data):
                     buffer_publisher.publish(buffmsg)
                     #print mybuffer
 
-                fr_index=0
-                z= -z_scale
+                fr_index = 0
+                z = - z_scale
             z = z + z_scale
             fr_index = fr_index + 1
         else:
+            overlap_part = []
             buffmsg = BufferMsg()
             buffmsg.header.stamp = rospy.Time.now()
             buffmsg.header.frame_id = frame_id
