@@ -8,7 +8,8 @@ from skimage.feature import hog
 from laser_clustering.msg import ClustersMsg
 from laser_analysis.msg import Analysis4MetersMsg
 import rospkg, math
-import scipy.spatial.distance as dist
+import walk_track as wt 
+
 
 z = 0
 dt = 25;#period in ms (dt between scans)
@@ -23,11 +24,11 @@ publish_viz = False
 viz_publisher = None
 
 scan_time = 0.0
-prev_median=[]
-medX=[]
-medY=[]
-tot_time=0.0
-tot_dist=0.0
+
+#list_of<WalkTrack>: 
+#It contains information about the walk statistics (distance in meters, time for that distance) for each traced_cluster.
+#Necessary for walk_speed()
+walkTrack = []
 
 
 def init():
@@ -61,6 +62,7 @@ def init():
 
     results4meters_publisher = rospy.Publisher(results4meters_topic, Analysis4MetersMsg, queue_size=10)
 
+
     if publish_viz:
         print 'todo'
         #viz_publisher = rospy.Publisher(viz_topic, TODO, queue_size=10)
@@ -81,6 +83,7 @@ def analysis(clusters_msg):
     global frame_id, publish_viz
     global seconds,prev_sec
     global scan_time
+    global walkTrack
 
     all_clusters = []
     all_hogs = []
@@ -95,24 +98,88 @@ def analysis(clusters_msg):
     if len(xi) != 0:
         scan_time = clusters_msg.scan_time
     else:
-        initialize_walk()
+        del walkTrack[:]
 
     array_sizes = np.array(clusters_msg.array_sizes)
+    num_clusters = np.array(clusters_msg.num_clusters)
     
     cnt=0
     prev_index = 0
 
+    #add new walk tracks
+    if len(array_sizes) > len(walkTrack):
+        for i in range(len(walkTrack), len(array_sizes)):
+            walkTrack.append(wt.WalkTrack())
+
+    #remove walk tracks
+    #you can identify them by the zeros in the num_clusters array
+    elif len(array_sizes) < len(walkTrack):
+        sumV = 0
+        k = 0
+        for j in range(0, len(num_clusters)):
+            if num_clusters[j] == 0:
+                if sumV == 0:
+                    if j == 0:
+                        #the first part of traced cluster is removed
+                        del walkTrack[0]
+                    else:
+                        #case where the removed clusters were in a row
+                        del walkTrack[k]
+
+                else:
+                    pos = np.where(array_sizes == sumV)[0]
+                    del walkTrack[pos+ (k+1)]
+                    sumV = 0
+
+            if sumV == array_sizes[k]:
+                k = k + 1
+                sumV = 0
+		    
+            sumV += num_clusters[j]
+
+        num_clusters = num_clusters[num_clusters != 0]
+
+
+    tot_sum = 0
+    cl_index = 0
     for i in range(0, len(array_sizes)):
         xk = []
         yk = []
         zk = []
+
+        if walkTrack[i].is_new():
+            newCluster = True
+        else:
+            newCluster = False
+
+        xCl = []
+        yCl = []
+
         for j in range(prev_index, prev_index+array_sizes[i]-1):
+
+            xCl.append(xi[j])
+            yCl.append(yi[j])
+           
+            #it is a cluster (part of traced one)
+            if len(xCl)-1 == num_clusters[cl_index]-1:
+                if newCluster:
+                    walk_speed(xCl, yCl, i)
+
+                cl_index += 1
+                tot_sum = tot_sum +len(xCl)
+                xCl = []
+                yCl = []
+
+
             xk.append(xi[j])
             yk.append(yi[j])
             zk.append(zi[j])
         prev_index = array_sizes[i] - 1
 
-        walk_speed(xk,yk)
+	# it takes only the last part-cluster
+        walk_speed(xCl, yCl, i)
+        tot_sum -= 1
+        
 
         #speed(xk,yk,zk)
         trans_matrix =[[xk,yk,zk]]
@@ -177,16 +244,34 @@ def analysis(clusters_msg):
             print 'test'
 
 
-def walk_speed(x, y):
+#It calculates the time in seconds that a human covers in <distance> meters.
+#Description of algorithm:
+#    It splits the data in <parts> parts.
+#    It takes the median (x,y)-points of each part and it calculates their distance and the respective time.
+#Arguments:
+#    x: data in x-dimension
+#    y: data in y-dimension
+#    pos: the position in walkTack array, which denotes the human
+#Recommendations: 
+#    - x,y should be points of a cluster (and not a traced_cluster)
+#    - usual number of points ~= 400-600
+def walk_speed(x, y, pos):
 
-    global tot_time
-    global tot_dist
-    global prev_median, medX, medY
     global timewindow, scan_time, distance
+    global walkTrack
 
     parts = 4
     split = len(x)/parts
     split_count = 0
+
+    human = walkTrack[pos]
+    
+    #the incrementation of time
+    #    -> it is related to the time between scans
+    time_increment = scan_time*((timewindow-2)/parts) 
+
+    if split == 0:
+        return
 
     while split_count <= len(x):
         xmed = np.median(x[split_count:split_count+split])
@@ -196,32 +281,21 @@ def walk_speed(x, y):
             split_count += split
             continue
 
-        if len(prev_median) != 0:
-            tot_dist = tot_dist + dist.euclidean([xmed, ymed], prev_median)
+        if not human.empty():
+            human.add_distance(xmed, ymed)
 	
-        prev_median = [xmed, ymed]
-        tot_time = tot_time + scan_time*((timewindow-2)/parts)   
-        
-	medX.append(xmed)
-	medY.append(ymed)
+        human.set_prevMedian(xmed, ymed)
+        human.set_time(time_increment)
+
+        human.addX(xmed)
+        human.addY(ymed)
 
         split_count += split
 
-        if tot_dist >= distance:
-            print '\n*****\nHe/She walked {} meters in {} seconds\n*****\n'.format(tot_dist, tot_time)
-            initialize_walk()
+        if human.get_distance() >= distance:
+            print '\n*****\nHuman {}: He/She walked {} meters in {} seconds\n*****\n'.format(pos, human.get_distance(), human.get_time())
+            human.initialise()
 
-
-#initialize the parameters for walk_speed calclulation
-def initialize_walk():
-    global tot_time, tot_dist
-    global medX, medY, prev_median 
-
-    prev_median=[]
-    medX=[]
-    medY=[]
-    tot_time = 0.0
-    tot_dist = 0.0
 
 
 

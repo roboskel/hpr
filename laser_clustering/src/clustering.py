@@ -49,6 +49,7 @@ def clustering_procedure(buffer):
 
         #empty array_sizes means that anyone listening to this message won't loop through the data
         clustersmsg.array_sizes = []
+        clustersmsg.num_clusters = []
         clusters_publisher.publish(clustersmsg)
     else:
         scan_time = buffer.scan_time
@@ -86,6 +87,7 @@ def clustering_procedure(buffer):
         clustersmsg.y = y_
         clustersmsg.z = z_
         clustersmsg.array_sizes = arr_sz
+        clustersmsg.num_clusters = []
         clustersmsg.scan_time = scan_time
         clusters_publisher.publish(clustersmsg)
 
