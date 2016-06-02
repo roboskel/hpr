@@ -21,7 +21,7 @@ class DBscanCluster:
 
     #add a new point to this cluster
     def addPoint(self, new_point):
-	np.append(self.points, new_point)
+	self.points = np.append(self.points, [new_point], axis = 0)
 	self._computeMedian()
 	self.numPts = self.numPts + 1
 

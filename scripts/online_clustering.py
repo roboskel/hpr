@@ -7,7 +7,7 @@ import my_cluster as cl
 
 prev_clusters = []	#an array that contains the <DBscanClusters> that are constructed in a previous phase. (Necessary for the online clustering)
 cluster_label = []	#the labels of the clusters until now 
-cluster_queue =  Queue.Queue(5)		#maximum size of the queue: 5 timewindows
+cluster_queue =  Queue.Queue(14)		#maximum size of the queue: 4 timewindows
 Eps = 0.5 #default
 
 
@@ -89,7 +89,7 @@ def onlineMedianDBscan(points, minPts):
 			point_id = max_id
 		
     	    #append the new point into the cluster_label
-	    np.append(cluster_label, point_id)
+	    cluster_label = np.append(cluster_label, [point_id], axis = 0)
 
 	#TODO: update the queue (remove/add new timewindow in the queue) and update the cluster labels and prev_clusters
 
@@ -129,6 +129,8 @@ def onlineDBscan(points, minPts):
     [m,n] = points.shape
     max_id = int(np.amax(cluster_label))
     point_id = 0
+    cluster_label = []
+
 
     for p in range(0, m-1):
 
@@ -148,12 +150,14 @@ def onlineDBscan(points, minPts):
 	    #the point's neighbors are borders of this cluster
 	    else:
 		min_dist = np.amin(D)
+		#print '[ON]: the point is a border with min distance = ',min_dist
 		min_index, Dout = existMinNoise(temp_outliers, points[p], min_dist) #min_index defines the index that the closest outlier cluster belongs
 	
 		#IS IT OK??? 
 		#the point will be added as noise bc it is close but the num of neighbors is < minPts
 		if min_index == -1:
-		    temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+                    max_id += 1
+		    temp_outliers.append(cl.DBscanCluster(max_id, np.array([points[p]]) ))
 		    point_id = max_id
 		    break
 		else:
@@ -171,6 +175,7 @@ def onlineDBscan(points, minPts):
 			del temp_outliers[min_index]
 			   
 			point_id = prev_clusters[i].getId()
+
 			break
 
 		    else:
@@ -192,12 +197,13 @@ def onlineDBscan(points, minPts):
 
 	    #it is a noise point
 	    if min_index == -1:
-		temp_outliers.append(cl.DBscanCluster(++max_id, np.array([points[p]]) ))
+                max_id += 1
+		temp_outliers.append(cl.DBscanCluster(max_id, np.array([points[p]]) ))
 		point_id = max_id
-		break
 
 	    else:
-		out_index = np.where(Dout<=Eps)[0] 
+		out_index = np.where(Dout<=Eps)[0]
+
 		if len(out_index) + 1 >= minPts:
 		    potential_cl = temp_outliers[min_index]
  		    potential_cl.addPoint(points[p])
@@ -205,11 +211,22 @@ def onlineDBscan(points, minPts):
 		    point_id = potential_cl.getId()
 		    prev_clusters.append(potential_cl)
 		    del temp_outliers[min_index]
-			   
-		    break
+                #it doesnt form a cluster, so put the point to the noise cluster
+                else:
+                    if len(out_index) == 0:
+                        max_id += 1
+		        temp_outliers.append(cl.DBscanCluster(max_id, np.array([points[p]]) ))
+		        point_id = max_id
+                    else:
+                        potential_cl = temp_outliers[min_index]
+                        potential_cl.addPoint(points[p])
+
+		        point_id = potential_cl.getId()
+                  
 
     	#append the new point into the cluster_label
-	np.append(cluster_label, point_id)
+	cluster_label = np.append(cluster_label, [point_id], axis = 0)
+        point_id = 0
 
 	#TODO: update the queue (remove/add new timewindow in the queue) and update the cluster labels and prev_clusters
 
@@ -226,7 +243,7 @@ def existMinNoise(outliers, point, min_dist = Eps):
     Dout = []
 
     for i in range(0,len(outliers)):
-	D = dist(point, outliers[i].getPoints)
+	D = dist(point, outliers[i].getPoints())
 
 	temp_d = np.amin(D)
 	# there is a minimum distance in the outliers
@@ -269,6 +286,7 @@ def dist(i,x) :
     x=np.array(x)
     [m,n]=x.shape
     D=np.zeros(m)
+
 
     if n==1 :
         D = abs( np.array(i) - x ).T
