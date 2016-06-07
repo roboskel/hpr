@@ -7,3 +7,5 @@ publish_viz: True
 viz_topic: "~viz_req"
 dt: 25
 human_speed: 5
+distance: 4
+timewindow: 40

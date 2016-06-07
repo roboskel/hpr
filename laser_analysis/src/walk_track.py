@@ -8,7 +8,8 @@ import scipy.spatial.distance as dist
 #    - tot_time: represents the time that the human walked fot <tot_dist> meters
 #    - medX: list of median data in x-dimension
 #    - medY: list of median data in y-dimension
-#    - prevMedian: the previous median (x,y)-point 
+#    - prevMedian: the previous median (x,y)-point
+#    - timestamp: the time that the human started to walk 
 #
 #Info:
 #   - Use of euclidean distance for the distance calculation between the points
@@ -22,6 +23,7 @@ class WalkTrack:
         self.medX = []
         self.medY = []
         self.prevMedian = []
+        self.timestamp = 0.0
 
     def is_new(self):
         return self.new
@@ -37,6 +39,12 @@ class WalkTrack:
 
     def set_time(self,time):
         self.tot_time += time
+
+    def get_timestamp(self):
+        return self.timestamp
+
+    def set_timestamp(self, timestamp):
+        self.timestamp = timestamp
 
     def addX(self, x):
         self.medX.append(x)
