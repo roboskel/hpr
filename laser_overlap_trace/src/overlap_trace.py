@@ -60,8 +60,9 @@ def get_centroid(cluster, choice):
 
     mean_x = np.mean(cluster[0][z_filter])
     mean_y = np.mean(cluster[1][z_filter])
+    mean_z = np.mean(cluster[2][z_filter])
 
-    return np.array((mean_x, mean_y))
+    return np.array((mean_x, mean_y, mean_z))
 
 
 def create_trace():
@@ -150,6 +151,7 @@ def overlap_trace(clusters_msg):
 
     if(len(array_sizes) > 0):
 
+
         for i in range(0, len(array_sizes)):
             xk = []
             yk = []
@@ -166,6 +168,8 @@ def overlap_trace(clusters_msg):
                 trace_array.append(get_centroid(cls[i], False))
                 trace_results.append([i])
                 cls_results.append([cls[i]])
+
+          
         else:
             #condition where the clusters have been reduced
             if trace_count:

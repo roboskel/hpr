@@ -52,7 +52,6 @@ def init():
     distance = rospy.get_param('~distance', 4)
 
     print input_clusters_topic
-    print 'tim = {} dist = {}'.format(timewindow, distance)
 
     z_scale = float(speed_*dt) / float(3600)
 
@@ -62,6 +61,7 @@ def init():
     LDA_classifier = pickle.load(open(classifier_path, "rb"))
 
     rospy.Subscriber(input_clusters_topic, ClustersMsg, analysis)
+    #rospy.Subscriber(input_clusters_topic, ClustersMsg, cluster_analysis)
 
     results4meters_publisher = rospy.Publisher(results4meters_topic, Analysis4MetersMsg, queue_size=10)
 
@@ -73,26 +73,19 @@ def init():
     while not rospy.is_shutdown():
         rospy.spin()
 
-#get the data from the laser scans and cluster them with DBSCAN
-#align each cluster regarding the variances of each dimension
-#gridfit each aligned cluster
-#hogs on each image for feature extraction
+#It makes the walk analysis for each traced_cluster that receives during the period of time.
+#Receives the data from the traced_clusters.
+#If a traced cluster represents a human walk, the method calls the walk_speed for each cluster that is just received.
+#For two not human walks in a row, it initialises the respective walkTrack.
 #-----------------------------------------
-#calls: speed(), overlap_trace()
+#calls: is_human(), walk_speed()
 def analysis(clusters_msg):
 
     global z, z_scale
-    global all_clusters, all_hogs, all_orthogonal
     global frame_id, publish_viz
     global seconds,prev_sec
     global scan_time, timestamp
     global walkTrack
-
-    all_clusters = []
-    all_hogs = []
-    all_orthogonal = []
-    hogs=[]
-    align_cl=[] #contains the aligned data clouds of each cluster
 
     xi = np.array(clusters_msg.x)
     yi = np.array(clusters_msg.y)
@@ -132,9 +125,13 @@ def analysis(clusters_msg):
                         del walkTrack[k]
 
                 else:
-                    pos = np.where(array_sizes == sumV)[0]
-                    del walkTrack[pos+ (k+1)]
-                    sumV = 0
+                    #the last cluster disappeared
+                    if j == len(num_clusters)-1:
+                        del walkTrack[len(walkTrack)-1]
+                    else:
+                        pos = np.where(array_sizes == sumV)[0]
+                        del walkTrack[pos+ (k+1)]
+                        sumV = 0
 
             if sumV == array_sizes[k]:
                 k = k + 1
@@ -159,10 +156,8 @@ def analysis(clusters_msg):
             yk.append(yi[j])
             zk.append(zi[j])
         prev_index = array_sizes[i] - 1
+       
         
-
-
-	'''
         if walkTrack[i].is_new():
             newCluster = True
         else:
@@ -171,7 +166,7 @@ def analysis(clusters_msg):
         xCl = []
         yCl = []
 
-        for j in range(prev_index, prev_index+array_sizes[i]-1):
+        for j in range(prev_index_walk, prev_index_walk+array_sizes[i]-1):
 
             xCl.append(xi[j])
             yCl.append(yi[j])
@@ -179,113 +174,40 @@ def analysis(clusters_msg):
             #it is a cluster (part of traced one)
             if len(xCl)-1 == num_clusters[cl_index]-1:
                 if newCluster:
-                    walk_speed(xCl, yCl, i)
+                    #call walk_speed only if it is a human walk. 
+                    #Otherwise, check whether it was predicted that it was stable in the previous cluster too. If yes then initialise it.
+                    if is_human(xk,yk,zk) == 1:
+                        walk_speed(xCl, yCl, i)
+                        walkTrack[i].set_stable(False)
+                    else:
+                        if walkTrack[i].is_stable():
+                            walkTrack[i].initialise()
+                        else:
+                            walk_speed(xCl, yCl, i)
 
+                        walkTrack[i].set_stable(True)
                 cl_index += 1
                 tot_sum = tot_sum +len(xCl)
                 xCl = []
                 yCl = []
 
 
-            xk.append(xi[j])
-            yk.append(yi[j])
-            zk.append(zi[j])
-        prev_index = array_sizes[i] - 1
+            
+        prev_index_walk = array_sizes[i] - 1
 
 	# it takes only the last part-cluster
-        walk_speed(xCl, yCl, i)
-        tot_sum -= 1
-        '''
-        
-
-        #speed(xk,yk,zk)
-        trans_matrix =[[xk,yk,zk]]
-
-        all_clusters.append([xk,yk,zk])
-
-        #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimension.
-        U,s,V=np.linalg.svd(np.cov([xk,yk,zk]), full_matrices=False)
-
-        #translate each cluster to the beginning of the axis and then do the rotation
-        [xnew,ynew,znew]=translate_cluster(xk,yk,zk)
-
-        #(traslation matrix) x (rotation matrix) = alignemt of cluster
-        alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
-        alignment_result=multiply_array(xnew,ynew,znew, V)
-
-        #steps2(xk,yk,zk)
-
-        align_cl.append(alignment_result)
-        all_orthogonal.append(alignment_result)
-        grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
-
-        grid=grid-np.amin(grid)
-
-        features=hog(grid)
-        f=hog(grid, orientations=6, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualise=False)
-        all_hogs.append(f)
-        hogs.append(f)  #extract hog features
-
-        #update_plots(valid_flag,hogs,xi,yi,zi,cluster_labels,vcl, align_cl, grids)
-        temp = []
-
-        if np.array(hogs).shape==(1,36):
-            temp = np.array(hogs)[0]
-
-        else:
-            for k in range(0,len(hogs)):
-                temp.append(np.array(hogs[k]))
-
-
-        results = LDA_classifier.predict(temp)
-        print results
-
-        
-        ###################################
-        if results[i] == 1:
-            if walkTrack[i].is_new():
-                newCluster = True
-            else:
-                newCluster = False
-
-            xCl = []
-            yCl = []
-
-            for j in range(prev_index_walk, prev_index_walk+array_sizes[i]-1):
-
-                xCl.append(xi[j])
-                yCl.append(yi[j])
-           
-                #it is a cluster (part of traced one)
-                if len(xCl)-1 == num_clusters[cl_index]-1:
-                    if newCluster:
-                        walk_speed(xCl, yCl, i)
-
-                    cl_index += 1
-                    tot_sum = tot_sum +len(xCl)
-                    xCl = []
-                    yCl = []
-
-
-            
-            prev_index_walk = array_sizes[i] - 1
-
-	    # it takes only the last part-cluster
+        if is_human(xk,yk,zk) == 1:
             walk_speed(xCl, yCl, i)
-            tot_sum -= 1
-        #######################################
-        
+        else:
+            if walkTrack[i].is_stable():
+                walkTrack[i].initialise()
+            else:
+                walk_speed(xCl, yCl, i)
 
-        [xc,yc,zc] = [align_cl[cnt][0], align_cl[cnt][1], align_cl[cnt][2]]
+            walkTrack[i].set_stable(True)
 
-
-        if len(xc)==0:
-            print 'out of data'
-            continue
-
-        cnt=cnt+1
-
-        hogs_temp = np.array(np.array(temp))
+        tot_sum -= 1
+   
 
         analysis4meters_msg = Analysis4MetersMsg()
         analysis4meters_msg.header.stamp = rospy.Time.now()
@@ -295,6 +217,65 @@ def analysis(clusters_msg):
         if publish_viz:
             #TODO publish required arrays
             print 'test'
+
+
+#Recoginition whether a traced_cluster is following a pattern of a human walk or not.
+#Steps:
+#    - align each traced_cluster regarding the variances of each dimension
+#    - gridfit each aligned cluster -> becomes an image
+#    - hogs on each image for feature extraction
+#    - the prediction is achieved with the use of LDA trained classifier
+#Arguments:
+#    - (x,y,z): the 3D data points of a traced_cluster
+def is_human(x, y, z):
+    global all_clusters, all_hogs, all_orthogonal
+
+    all_clusters = []
+    all_hogs = []
+    all_orthogonal = []
+    hogs=[]
+    align_cl=[] #contains the aligned data clouds of each cluster
+
+    trans_matrix =[[x,y,z]]
+
+    all_clusters.append([x,y,z])
+
+    #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimension.
+    U,s,V=np.linalg.svd(np.cov([x,y,z]), full_matrices=False)
+
+    #translate each cluster to the beginning of the axis and then do the rotation
+    [xnew,ynew,znew]=translate_cluster(x,y,z)
+
+    #(traslation matrix) x (rotation matrix) = alignemt of cluster
+    alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
+    alignment_result=multiply_array(xnew,ynew,znew, V)
+
+
+    align_cl.append(alignment_result)
+    all_orthogonal.append(alignment_result)
+    grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
+
+    grid=grid-np.amin(grid)
+
+    features=hog(grid)
+    f=hog(grid, orientations=6, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualise=False)
+    all_hogs.append(f)
+    hogs.append(f)  #extract hog features
+
+    temp = []
+
+    if np.array(hogs).shape==(1,36):
+        temp = np.array(hogs)[0]
+
+    else:
+        for k in range(0,len(hogs)):
+            temp.append(np.array(hogs[k]))
+
+
+    results = LDA_classifier.predict(temp)
+    print 'predicted result = ',results
+
+    return results[0]
 
 
 #It calculates the time (in seconds) where a human needs to cover <distance> meters.
@@ -318,6 +299,7 @@ def walk_speed(x, y, pos):
     split_count = 0
 
     human = walkTrack[pos]
+    #print 'human ',pos
     
     #the incrementation of time
     #    -> it is related to the time between scans
@@ -349,7 +331,7 @@ def walk_speed(x, y, pos):
 
         if human.get_distance() >= distance:
             print '\n*****\nHuman {}: He/She walked {} meters in {} seconds\n*****\n'.format(pos, human.get_distance(), human.get_time())
-            write_results(pos)
+            #write_results(pos)
             human.initialise()
 
 

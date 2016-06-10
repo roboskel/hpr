@@ -69,6 +69,7 @@ def clustering_procedure(buffer):
 
         for k in range(1,max_label+1) :
             filter = np.where(cluster_labels==k)
+
             if len(filter[0])>40 :
                 xk = np.array(buffer.x)[filter]
                 yk = np.array(buffer.y)[filter]

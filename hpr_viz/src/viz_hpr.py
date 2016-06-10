@@ -17,6 +17,7 @@ plot_figure = None
 wall_x = []
 wall_y = []
 top_view_figure = None
+cc  =  ['r', 'c', '#808080', 'k',  '#FF6600', '#990099', '#0000FF', 'g','#8B4513','y','#FFD700']
 
 
 def init():
@@ -108,6 +109,7 @@ def plot_walls(wall_data):
 def plot_clustering(data):
     global num_of_diagrams, top_view_figure, clusters_plot, wall_x, wall_y, pause, stdscr
 
+
     if(len(data.array_sizes) > 0):
         if pause_function:
             key = stdscr.getch()
@@ -136,6 +138,10 @@ def plot_clustering(data):
 
 def plot_overlap(data):
     global overlap_plot, pause
+
+    array_sizes = np.array(data.array_sizes)
+    prev_index = 0
+
     if(len(data.array_sizes) > 0):
         if not pause:
             overlap_plot.clear()
@@ -143,7 +149,19 @@ def plot_overlap(data):
             overlap_plot.set_xlabel('X - Distance')
             overlap_plot.set_ylabel('Y - Robot')
             overlap_plot.set_zlabel('Z - Time')
-            overlap_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
+
+            for i in range(0, len(array_sizes)):
+                xk = []
+                yk = []
+                zk = []
+
+                for j in range(prev_index, prev_index+array_sizes[i]-1):
+                    xk.append(data.x[j])
+                    yk.append(data.y[j])
+                    zk.append(data.z[j])
+                prev_index = array_sizes[i] - 1
+
+                overlap_plot.scatter(xk, yk, zk, 'z', 30, cc[i%12])
             plt.draw()
 
 

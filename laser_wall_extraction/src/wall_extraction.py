@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import roslib, rospy
 import numpy as np
+import csv
 from sensor_msgs.msg import LaserScan
 from laser_wall_extraction.msg import BufferMsg
 from laser_wall_extraction.msg import WallVizMsg
@@ -36,7 +37,7 @@ def init():
 
     scan_topic = rospy.get_param('~scan_topic','scan')
     timewindow = rospy.get_param('~timewindow', 40)
-    range_limit = rospy.get_param('~max_range', 10)
+    range_limit = rospy.get_param('~range_limit', 10)
     use_overlap = rospy.get_param('~use_overlap', True)
     buffer_topic = rospy.get_param('~buffer_topic','~buffer')
     frame_id = rospy.get_param('~frame_id','laser_link')
@@ -65,6 +66,7 @@ def wall_extraction(laser_data):
     global viz_publisher, publish_viz
 
     laser_ranges = list(laser_data.ranges)
+    
     for i in range(0, len(laser_ranges)):
         if laser_ranges[i]>range_limit:
                 j = i - 1;
@@ -74,7 +76,7 @@ def wall_extraction(laser_data):
                             break;
                 laser_ranges[i] = laser_ranges[j];
 
-
+    
     if wall_flag == 0:
         if w_index == 0:
             sampling = np.arange(0,len(np.array(laser_ranges)),2)#apply sampling e.g every 2 steps
@@ -102,11 +104,13 @@ def wall_extraction(laser_data):
             wall = (np.min(mybuffer, axis=0)[sampling])-0.1 #select min of measurements
             wall_cart = np.array(pol2cart(wall,phi,0)) #convert to Cartesian
             wall_flag = 1
+            print 'walls are set'
             if publish_viz:
                 wvm = WallVizMsg()
                 wvm.x = wall_cart[:,0]
                 wvm.y = wall_cart[:,1]
                 viz_publisher.publish(wvm)
+       
                 
     else:
         #walls are set, process scans
@@ -115,8 +119,8 @@ def wall_extraction(laser_data):
         ranges = ranges[filter]
         theta = phi[filter]
 
-        if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
 
+        if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
             C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
             if (fr_index == 1 ):
@@ -147,6 +151,7 @@ def wall_extraction(laser_data):
                 mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
                 mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
 
+
                 if len(mybuffer > 3): #at least 3 points are needed to form a cluster
                     buffmsg = BufferMsg()
                     buffmsg.header.stamp = rospy.Time.now()
@@ -156,7 +161,6 @@ def wall_extraction(laser_data):
                     buffmsg.z = mybuffer[:,2]
                     buffmsg.scan_time = laser_data.scan_time
                     buffer_publisher.publish(buffmsg)
-                    #print mybuffer
 
                 fr_index = 0
                 z = - z_scale

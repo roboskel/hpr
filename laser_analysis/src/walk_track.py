@@ -9,7 +9,8 @@ import scipy.spatial.distance as dist
 #    - medX: list of median data in x-dimension
 #    - medY: list of median data in y-dimension
 #    - prevMedian: the previous median (x,y)-point
-#    - timestamp: the time that the human started to walk 
+#    - timestamp: the time that the human started to walk, as it is declared from ROS.time
+#    - stable: checks whether the human is motionless or not
 #
 #Info:
 #   - Use of euclidean distance for the distance calculation between the points
@@ -24,6 +25,7 @@ class WalkTrack:
         self.medY = []
         self.prevMedian = []
         self.timestamp = 0.0
+        self.stable = False
 
     def is_new(self):
         return self.new
@@ -45,6 +47,12 @@ class WalkTrack:
 
     def set_timestamp(self, timestamp):
         self.timestamp = timestamp
+
+    def is_stable(self):
+        return self.stable
+
+    def set_stable(self, current_condition):
+        self.stable = current_condition
 
     def addX(self, x):
         self.medX.append(x)
@@ -70,5 +78,6 @@ class WalkTrack:
         self.medX = []
         self.medY = []
         self.prevMedian = []
+        self.stable = False
 
 
