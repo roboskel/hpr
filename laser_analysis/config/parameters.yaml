@@ -9,3 +9,4 @@ dt: 25
 human_speed: 5
 distance: 4
 timewindow: 40
+file: '/home/rosturtle/Desktop/hprStat.csv'

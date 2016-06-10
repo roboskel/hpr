@@ -1,9 +1,10 @@
 import scipy.spatial.distance as dist
 
-#Class that is used to keep necessary information for every traced_cluster-human about the walk_speed procedure.
+#Class that is used to keep necessary information for every traced_cluster about. It is useful for the walk_analysis procedure.
 
 #Attributes:
 #    - new: defines whether the human is appeared for the first time
+#    - hum_id: an identifier of the human
 #    - tot_dist: represents the distance that the human walked until now
 #    - tot_time: represents the time that the human walked fot <tot_dist> meters
 #    - medX: list of median data in x-dimension
@@ -17,8 +18,9 @@ import scipy.spatial.distance as dist
 
 class WalkTrack:
 
-    def __init__(self):
+    def __init__(self, hum_id):
         self.new = True
+        self.hum_id = hum_id
         self.tot_dist = 0.0
         self.tot_time = 0.0
         self.medX = []
@@ -29,6 +31,9 @@ class WalkTrack:
 
     def is_new(self):
         return self.new
+
+    def get_id(self):
+        return self.hum_id
 
     def get_distance(self):
         return self.tot_dist

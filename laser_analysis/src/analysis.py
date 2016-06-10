@@ -11,7 +11,6 @@ import rospkg, math
 import walk_track as wt 
 import csv
 
-
 z = 0
 dt = 25;#period in ms (dt between scans)
 speed_ = 5;#human walking speed in km/h
@@ -19,24 +18,28 @@ z_scale = float(speed_*dt) / float(3600)
 LDA_classifier = None
 results4meters_publisher = None
 scan_parts = 5
+cluster_parts = 4
 timewindow = 40
 distance = 4
 publish_viz = False
 viz_publisher = None
+stat_file = '/home/hprStats.csv'
 
 scan_time = 0.0
 timestamp = 0.0
 
 #list_of<WalkTrack>: 
 #It contains information about the walk statistics (distance in meters, time for that distance) for each traced_cluster.
-#Necessary for walk_speed()
+#Necessary for walk_analysis() calculation
 walkTrack = []
+hum_id = 0
 
 
 def init():
     global results4meters_publisher, frame_id, LDA_classifier, publish_viz, viz_publisher
     global dt, speed_, z_scale
     global timewindow, distance
+    global stat_file
 
     rospy.init_node('laser_analysis')
 
@@ -50,6 +53,7 @@ def init():
     speed_ = rospy.get_param('~human_speed', 5)
     timewindow = rospy.get_param('~timewindow', 40)
     distance = rospy.get_param('~distance', 4)
+    stat_file = rospy.get_param('~file', '/home/hprStats.csv')
 
     print input_clusters_topic
 
@@ -73,19 +77,20 @@ def init():
     while not rospy.is_shutdown():
         rospy.spin()
 
+
 #It makes the walk analysis for each traced_cluster that receives during the period of time.
 #Receives the data from the traced_clusters.
-#If a traced cluster represents a human walk, the method calls the walk_speed for each cluster that is just received.
+#If a traced cluster represents a human walk, the method calls the walk_analysis for each cluster that is just received.
 #For two not human walks in a row, it initialises the respective walkTrack.
 #-----------------------------------------
-#calls: is_human(), walk_speed()
+#calls: human_predict(), walk_analysis()
 def analysis(clusters_msg):
 
     global z, z_scale
     global frame_id, publish_viz
     global seconds,prev_sec
     global scan_time, timestamp
-    global walkTrack
+    global walkTrack, hum_id
 
     xi = np.array(clusters_msg.x)
     yi = np.array(clusters_msg.y)
@@ -107,7 +112,8 @@ def analysis(clusters_msg):
     #add new walk tracks
     if len(array_sizes) > len(walkTrack):
         for i in range(len(walkTrack), len(array_sizes)):
-            walkTrack.append(wt.WalkTrack())
+            walkTrack.append(wt.WalkTrack(hum_id))
+            hum_id += 1
 
     #remove walk tracks
     #you can identify them by the zeros in the num_clusters array
@@ -150,7 +156,7 @@ def analysis(clusters_msg):
         yk = []
         zk = []
 
-        
+        #(xk, yk, zk): 3D data points for each traced_cluster
         for j in range(prev_index, prev_index+array_sizes[i]-1):
             xk.append(xi[j])
             yk.append(yi[j])
@@ -163,6 +169,7 @@ def analysis(clusters_msg):
         else:
             newCluster = False
 
+        #(xCl,yCl): data points for each cluster in a traced_cluster
         xCl = []
         yCl = []
 
@@ -174,16 +181,16 @@ def analysis(clusters_msg):
             #it is a cluster (part of traced one)
             if len(xCl)-1 == num_clusters[cl_index]-1:
                 if newCluster:
-                    #call walk_speed only if it is a human walk. 
-                    #Otherwise, check whether it was predicted that it was stable in the previous cluster too. If yes then initialise it.
-                    if is_human(xk,yk,zk) == 1:
-                        walk_speed(xCl, yCl, i)
+                    #call walk_analysis only if it is a human walk. 
+                    #Otherwise, check whether it was predicted that it was motionless in the previous cluster too. If yes then initialise its walk track.
+                    if human_predict(xk,yk,zk) == 1:
+                        walk_analysis(xCl, yCl, i)
                         walkTrack[i].set_stable(False)
                     else:
                         if walkTrack[i].is_stable():
                             walkTrack[i].initialise()
                         else:
-                            walk_speed(xCl, yCl, i)
+                            walk_analysis(xCl, yCl, i)
 
                         walkTrack[i].set_stable(True)
                 cl_index += 1
@@ -195,14 +202,14 @@ def analysis(clusters_msg):
             
         prev_index_walk = array_sizes[i] - 1
 
-	# it takes only the last part-cluster
-        if is_human(xk,yk,zk) == 1:
-            walk_speed(xCl, yCl, i)
+	# it takes only the last part-cluster bc the previous clusters where computed before (slice-window mode).
+        if human_predict(xk,yk,zk) == 1:
+            walk_analysis(xCl, yCl, i)
         else:
             if walkTrack[i].is_stable():
                 walkTrack[i].initialise()
             else:
-                walk_speed(xCl, yCl, i)
+                walk_analysis(xCl, yCl, i)
 
             walkTrack[i].set_stable(True)
 
@@ -227,18 +234,11 @@ def analysis(clusters_msg):
 #    - the prediction is achieved with the use of LDA trained classifier
 #Arguments:
 #    - (x,y,z): the 3D data points of a traced_cluster
-def is_human(x, y, z):
-    global all_clusters, all_hogs, all_orthogonal
+def human_predict(x, y, z):
 
-    all_clusters = []
-    all_hogs = []
-    all_orthogonal = []
     hogs=[]
-    align_cl=[] #contains the aligned data clouds of each cluster
 
     trans_matrix =[[x,y,z]]
-
-    all_clusters.append([x,y,z])
 
     #we get U by applying svd to the covariance matrix. U represents the rotation matrix of each cluster based on the variance of each dimension.
     U,s,V=np.linalg.svd(np.cov([x,y,z]), full_matrices=False)
@@ -250,16 +250,12 @@ def is_human(x, y, z):
     alignment_result=[[sum(a*b for a,b in zip(X_row,Y_col)) for X_row in zip(*[xnew,ynew,znew])] for Y_col in U]
     alignment_result=multiply_array(xnew,ynew,znew, V)
 
-
-    align_cl.append(alignment_result)
-    all_orthogonal.append(alignment_result)
     grid=gridfit(alignment_result[0], alignment_result[1], alignment_result[2], 16, 16) #extract surface - y,z,x alignment_result[1]
 
     grid=grid-np.amin(grid)
 
     features=hog(grid)
     f=hog(grid, orientations=6, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualise=False)
-    all_hogs.append(f)
     hogs.append(f)  #extract hog features
 
     temp = []
@@ -280,7 +276,7 @@ def is_human(x, y, z):
 
 #It calculates the time (in seconds) where a human needs to cover <distance> meters.
 #Description of algorithm:
-#    It splits the data in <parts> parts.
+#    It splits the data in <cluster_parts> parts.
 #    It takes the median (x,y)-points of each part and it calculates their distance and the respective time.
 #Arguments:
 #    x: data in x-dimension
@@ -289,21 +285,19 @@ def is_human(x, y, z):
 #Recommendations: 
 #    - x,y should be points of a cluster (and not a traced_cluster)
 #    - usual number of points ~= 400-600
-def walk_speed(x, y, pos):
+def walk_analysis(x, y, pos):
 
-    global timewindow, scan_time, distance, timestamp
+    global timewindow, scan_time, distance, timestamp, cluster_parts
     global walkTrack
 
-    parts = 4
-    split = len(x)/parts
+    split = len(x)/cluster_parts
     split_count = 0
 
     human = walkTrack[pos]
-    #print 'human ',pos
     
     #the incrementation of time
     #    -> it is related to the time between scans
-    time_increment = scan_time*((timewindow-2)/parts) 
+    time_increment = scan_time*((timewindow-2)/cluster_parts) 
 
     if split == 0:
         return
@@ -330,26 +324,24 @@ def walk_speed(x, y, pos):
         split_count += split
 
         if human.get_distance() >= distance:
-            print '\n*****\nHuman {}: He/She walked {} meters in {} seconds\n*****\n'.format(pos, human.get_distance(), human.get_time())
-            #write_results(pos)
+            print '\n*****\nHuman {} walked {} meters in {} seconds\n*****\n'.format(human.get_id(), human.get_distance(), human.get_time())
+            write_results(pos)
             human.initialise()
 
 
 def write_results(pos):
 
     global walkTrack,timestamp
+    global stat_file
 
     human = walkTrack[pos]
 
-    ar = [[pos, human.get_timestamp(), timestamp, human.get_distance(), human.get_time()]]
-    with open('/home/rosturtle/Desktop/testFile.csv','a') as csvfile:
+    ar = [[human.get_id(), human.get_timestamp(), timestamp, human.get_distance(), human.get_time()]]
+    with open(stat_file,'a') as csvfile:
         wr = csv.writer(csvfile, dialect='excel')
         for row in ar:
-            #print 'row = ',row
             wr.writerow(row)
         
-
-
 
 
 #calculates the speed of the first 25 frames (for each cluster), i.e the m/sec that the human walk for each scan.
