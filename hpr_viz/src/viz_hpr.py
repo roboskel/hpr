@@ -18,6 +18,9 @@ wall_x = []
 wall_y = []
 top_view_figure = None
 cc  =  ['r', 'c', '#808080', 'k',  '#FF6600', '#990099', '#0000FF', 'g','#8B4513','y','#FFD700']
+clear_top_plot = True
+clear_clusters_plot = True
+clear_overlap_plot = True
 
 
 def init():
@@ -107,7 +110,7 @@ def plot_walls(wall_data):
     plt.draw()
 
 def plot_clustering(data):
-    global num_of_diagrams, top_view_figure, clusters_plot, wall_x, wall_y, pause, stdscr
+    global num_of_diagrams, top_view_figure, clusters_plot, wall_x, wall_y, pause, stdscr, clear_top_plot, clear_clusters_plot
 
 
     if(len(data.array_sizes) > 0):
@@ -119,6 +122,7 @@ def plot_clustering(data):
                 print 'Pause = \033[93m '+ str(pause) + ' \033[0m'
 
         if not pause:
+	    clear_top_plot = False
             top_view_figure.clear()
             top_view_figure.set_title("Top view")
             top_view_figure.set_xlabel('Vertical distance')
@@ -127,6 +131,7 @@ def plot_clustering(data):
             top_view_figure.scatter(data.x, data.y, 20, 'red')
 
             if num_of_diagrams > 1:
+	        clear_clusters_plot = False
                 clusters_plot.clear()
                 clusters_plot.set_title("3D view")
                 clusters_plot.set_xlabel('X - Distance')
@@ -135,9 +140,26 @@ def plot_clustering(data):
                 clusters_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
             plt.draw()
 
+    else:
+        if not clear_top_plot:
+            top_view_figure.clear()
+	    top_view_figure.set_title("Top view")
+            top_view_figure.set_xlabel('Vertical distance')
+            top_view_figure.set_ylabel('Robot is here')
+            top_view_figure.plot(wall_x, wall_y)
+	    clear_top_plot = True
+	    plt.draw()
+	if num_of_diagrams > 1 and not clear_clusters_plot:
+	    clusters_plot.clear()
+	    top_view_figure.set_title("Top view")
+            top_view_figure.set_xlabel('Vertical distance')
+            top_view_figure.set_ylabel('Robot is here')
+	    clear_clusters_plot = True
+	    plt.draw()
+
 
 def plot_overlap(data):
-    global overlap_plot, pause
+    global overlap_plot, pause, clear_overlap_plot
 
     array_sizes = np.array(data.array_sizes)
     prev_index = 0
@@ -149,6 +171,7 @@ def plot_overlap(data):
             overlap_plot.set_xlabel('X - Distance')
             overlap_plot.set_ylabel('Y - Robot')
             overlap_plot.set_zlabel('Z - Time')
+	    clear_overlap_plot = False
 
             for i in range(0, len(array_sizes)):
                 xk = []
@@ -163,6 +186,16 @@ def plot_overlap(data):
 
                 overlap_plot.scatter(xk, yk, zk, 'z', 30, cc[i%12])
             plt.draw()
+    else:
+        if not clear_overlap_plot:
+	    overlap_plot.clear()
+            overlap_plot.set_title("Traced 3D clusters")
+            overlap_plot.set_xlabel('X - Distance')
+            overlap_plot.set_ylabel('Y - Robot')
+            overlap_plot.set_zlabel('Z - Time')
+            clear_overlap_plot = True
+	    plt.draw()
+
 
 
 if __name__ == '__main__':

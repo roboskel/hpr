@@ -24,6 +24,7 @@ distance = 4
 publish_viz = False
 viz_publisher = None
 stat_file = '/home/hprStats.csv'
+writeToFile = False
 
 scan_time = 0.0
 timestamp = 0.0
@@ -39,7 +40,7 @@ def init():
     global results4meters_publisher, frame_id, LDA_classifier, publish_viz, viz_publisher
     global dt, speed_, z_scale
     global timewindow, distance
-    global stat_file
+    global stat_file, writeToFile
 
     rospy.init_node('laser_analysis')
 
@@ -53,6 +54,7 @@ def init():
     speed_ = rospy.get_param('~human_speed', 5)
     timewindow = rospy.get_param('~timewindow', 40)
     distance = rospy.get_param('~distance', 4)
+    writeToFile = rospy.get_param('~write_to_file', False)
     stat_file = rospy.get_param('~file', '/home/hprStats.csv')
 
     print input_clusters_topic
@@ -216,11 +218,6 @@ def analysis(clusters_msg):
         tot_sum -= 1
    
 
-        analysis4meters_msg = Analysis4MetersMsg()
-        analysis4meters_msg.header.stamp = rospy.Time.now()
-        analysis4meters_msg.header.frame_id = frame_id
-        #TODO add speed here
-
         if publish_viz:
             #TODO publish required arrays
             print 'test'
@@ -288,7 +285,7 @@ def human_predict(x, y, z):
 def walk_analysis(x, y, pos):
 
     global timewindow, scan_time, distance, timestamp, cluster_parts
-    global walkTrack
+    global walkTrack, writeToFile, frame_id, results4meters_publisher
 
     split = len(x)/cluster_parts
     split_count = 0
@@ -325,7 +322,15 @@ def walk_analysis(x, y, pos):
 
         if human.get_distance() >= distance:
             print '\n*****\nHuman {} walked {} meters in {} seconds\n*****\n'.format(human.get_id(), human.get_distance(), human.get_time())
-            write_results(pos)
+	    analysis4meters_msg = Analysis4MetersMsg()
+            analysis4meters_msg.header.stamp = rospy.Time.now()
+            analysis4meters_msg.header.frame_id = frame_id
+	    analysis4meters_msg.human_id = human.get_id()
+	    analysis4meters_msg.time_needed = human.get_time()
+	    analysis4meters_msg.distance = human.get_distance()
+	    results4meters_publisher.publish(analysis4meters_msg)
+            if writeToFile:
+                write_results(pos)
             human.initialise()
 
 

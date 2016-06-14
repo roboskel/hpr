@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <launch>
-	<master auto="start"/>
 
-	<node pkg="human_pattern_recognition" type="hpr.py" respawn="false" name="human_pattern_recognition" output="screen">
-		<param name="classifier_path" value="$(find human_pattern_recognition)/scripts/cluster_labels/LDA_classifier.p" />
-		<param name="save_path"  value="$(find human_pattern_recognition)/scripts/cluster_labels/" />
-		<param name="scan_topic" type="str" value="scan" />
-		<param name="timewindow" type="int" value="40" />
-                <param name="max_range" type="int" value="10" />
-                <param name="save_metrics" type="bool" value="False" />
-                <param name="pause_function" type="bool" value="False" />
-		<param name="num_of_diagrams" type="int" value="3"/><!-- 0-3 -->
+
+	<node pkg="laser_wall_extraction" type="wall_extraction.py" respawn="false" name="laser_wall_extraction" output="screen">
+		<rosparam file="$(find laser_wall_extraction)/config/parameters.yaml" command="load" />
+	</node>	
+
+
+	<node pkg="laser_overlap_trace" type="overlap_trace.py" respawn="false" name="laser_overlap_trace" output="screen">
+		<rosparam file="$(find laser_overlap_trace)/config/parameters.yaml" command="load" />
 	</node>
+
+	<node pkg="laser_clustering" type="clustering.py" respawn="false" name="laser_clustering" output="screen">
+		<rosparam file="$(find laser_clustering)/config/parameters.yaml" command="load" />
+	</node>
+
+	<node pkg="laser_analysis" type="analysis.py" respawn="false" name="laser_analysis" output="screen">
+		<rosparam file="$(find laser_analysis)/config/parameters.yaml" command="load" />
+	</node>
+
 </launch>
