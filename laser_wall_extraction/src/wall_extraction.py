@@ -27,6 +27,7 @@ frame_id = ''
 
 publish_viz = False
 viz_publisher = None
+wall_cart = None
 
 
 def init():
@@ -48,6 +49,8 @@ def init():
 
     z_scale = float(speed_*dt) / float(3600)
 
+    print 'z scale = ',z_scale 
+
     rospy.Subscriber(scan_topic, LaserScan, wall_extraction)
 
     buffer_publisher = rospy.Publisher(buffer_topic, BufferMsg, queue_size=10)
@@ -63,7 +66,7 @@ def wall_extraction(laser_data):
     global z, z_scale
     global mybuffer, wall, sampling, phi, mybuffer_tmp
     global use_overlap, overlap_part, frame_id
-    global viz_publisher, publish_viz
+    global viz_publisher, publish_viz, wall_cart
 
     laser_ranges = list(laser_data.ranges)
     
@@ -113,6 +116,11 @@ def wall_extraction(laser_data):
        
                 
     else:
+        if publish_viz:
+                wvm = WallVizMsg()
+                wvm.x = wall_cart[:,0]
+                wvm.y = wall_cart[:,1]
+                viz_publisher.publish(wvm)
         #walls are set, process scans
         ranges = np.array(laser_ranges)[sampling]
         filter = np.where(ranges < wall) # filter out walls

@@ -22,11 +22,15 @@ clear_top_plot = True
 clear_clusters_plot = True
 clear_overlap_plot = True
 
+img_counter = 1
+path = '/home/turtlebot/hpr_images/'
+wall_sub = None
+
 
 def init():
     global num_of_diagrams, pause_function
     global plot_figure, top_view_figure, clusters_plot, overlap_plot
-    global trace_3d_figure, stdscr
+    global trace_3d_figure, stdscr, wall_sub
 
     rospy.init_node('hpr_viz')
 
@@ -42,7 +46,7 @@ def init():
         stdscr.keypad(1)
         stdscr.timeout(0);
 
-    rospy.Subscriber(wall_input_topic, WallVizMsg, plot_walls)
+    wall_sub = rospy.Subscriber(wall_input_topic, WallVizMsg, plot_walls)
 
     rospy.Subscriber(clustering_input_topic, ClustersMsg, plot_clustering)
 
@@ -99,7 +103,7 @@ def init():
         curses.endwin()
 
 def plot_walls(wall_data):
-    global wall_x, wall_y, top_view_figure
+    global wall_x, wall_y, top_view_figure, wall_sub
     wall_x = wall_data.x
     wall_y = wall_data.y
     top_view_figure.clear()
@@ -108,9 +112,11 @@ def plot_walls(wall_data):
     top_view_figure.set_ylabel('Robot is here')
     top_view_figure.plot(wall_x, wall_y)
     plt.draw()
+    wall_sub.unregister()
 
 def plot_clustering(data):
     global num_of_diagrams, top_view_figure, clusters_plot, wall_x, wall_y, pause, stdscr, clear_top_plot, clear_clusters_plot
+    global img_counter, path
 
 
     if(len(data.array_sizes) > 0):
@@ -138,8 +144,11 @@ def plot_clustering(data):
                 clusters_plot.set_ylabel('Y - Robot')
                 clusters_plot.set_zlabel('Z - Time')
                 clusters_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
-            plt.draw()
 
+
+            plt.draw()
+            plt.savefig(path+'clusters_'+str(img_counter), format='png')
+    
     else:
         if not clear_top_plot:
             top_view_figure.clear()
@@ -156,10 +165,11 @@ def plot_clustering(data):
             top_view_figure.set_ylabel('Robot is here')
 	    clear_clusters_plot = True
 	    plt.draw()
-
+    
 
 def plot_overlap(data):
     global overlap_plot, pause, clear_overlap_plot
+    global img_counter, path
 
     array_sizes = np.array(data.array_sizes)
     prev_index = 0
@@ -185,7 +195,12 @@ def plot_overlap(data):
                 prev_index = array_sizes[i] - 1
 
                 overlap_plot.scatter(xk, yk, zk, 'z', 30, cc[i%12])
+
+       
             plt.draw()
+            plt.savefig(path+'tracedCl_'+str(img_counter), format='png')
+            img_counter += 1
+    
     else:
         if not clear_overlap_plot:
 	    overlap_plot.clear()
@@ -195,7 +210,7 @@ def plot_overlap(data):
             overlap_plot.set_zlabel('Z - Time')
             clear_overlap_plot = True
 	    plt.draw()
-
+    
 
 
 if __name__ == '__main__':

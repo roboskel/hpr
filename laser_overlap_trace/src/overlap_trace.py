@@ -78,9 +78,18 @@ def create_trace():
     #for each cluster
     for j in range(0,max_cls):
         for i in range(0, len(trace_results)):
+
             if len(trace_results[i]) > counter:
                 counter = counter +1
-                temp.append(cls_results[i][trace_results[i].index(-1)])
+       
+                try:
+                    temp.append(cls_results[i][trace_results[i].index(-1)])
+                except ValueError:
+                   if j in trace_results[i]:
+                        print 'ValueError exception: with trace_results = {} and j = {}'.format(trace_results, j)
+                        temp.append(cls_results[i][trace_results[i].index(j)])
+                   else:
+                        continue
 
                 num_clusters[j] = num_clusters[j] + 1
             if j in trace_results[i]:
@@ -168,7 +177,6 @@ def overlap_trace(clusters_msg):
                 trace_array.append(get_centroid(cls[i], False))
                 trace_results.append([i])
                 cls_results.append([cls[i]])
-
           
         else:
             #condition where the clusters have been reduced

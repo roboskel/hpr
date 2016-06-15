@@ -1,0 +1,13 @@
+#input_clusters_topic: "laser_clustering/clusters" #"laser_clustering/clusters" #"laser_overlap_trace/clusters"
+input_clusters_topic: "laser_overlap_trace/clusters"
+results4meters_topic: "~results4meters"
+frame_id: "laser_link"
+classifier_file: "LDA_classifier.p" #place the file inside the classification_files folder.
+publish_viz: True
+viz_topic: "~viz_req"
+dt: 60
+human_speed: 5
+distance: 4
+timewindow: 22
+write_to_file: False
+file: '/home/rosturtle/Desktop/hprStat.csv'
