@@ -28,6 +28,7 @@ writeToFile = False
 
 scan_time = 0.0
 timestamp = 0.0
+dt_ratio = 1.0
 
 #list_of<WalkTrack>: 
 #It contains information about the walk statistics (distance in meters, time for that distance) for each traced_cluster.
@@ -61,6 +62,7 @@ def init():
 
     z_scale = float(speed_*dt) / float(3600)
 
+
     rospack = rospkg.RosPack()
 
     classifier_path = rospack.get_path('laser_analysis')+'/classification_files/'+classifier_file
@@ -88,7 +90,7 @@ def init():
 #calls: human_predict(), walk_analysis()
 def analysis(clusters_msg):
 
-    global z, z_scale
+    global z, z_scale, dt
     global frame_id, publish_viz
     global seconds,prev_sec
     global scan_time, timestamp
@@ -100,6 +102,9 @@ def analysis(clusters_msg):
     
     if len(xi) != 0:
         scan_time = clusters_msg.scan_time
+
+        #ratio between the time that the laser scans to the time between them. zscale depends on dt value.
+        dt_ratio = round(float(scan_time * 1000) / dt, 2) 
         timestamp = clusters_msg.header.stamp
     else:
         del walkTrack[:]
@@ -223,7 +228,146 @@ def analysis(clusters_msg):
             print 'test'
 
 
-#Recoginition whether a traced_cluster is following a pattern of a human walk or not.
+def cluster_analysis(clusters_msg):
+
+    global z, z_scale
+    global frame_id, publish_viz
+    global seconds,prev_sec
+    global scan_time, timestamp
+    global walkTrack, hum_id
+
+    xi = np.array(clusters_msg.x)
+    yi = np.array(clusters_msg.y)
+    zi = np.array(clusters_msg.z)
+    
+    if len(xi) != 0:
+        scan_time = clusters_msg.scan_time
+        timestamp = clusters_msg.header.stamp
+    else:
+        del walkTrack[:]
+
+    array_sizes = np.array(clusters_msg.array_sizes)
+    num_clusters = np.array(clusters_msg.num_clusters)
+    
+    cnt=0
+    prev_index = 0
+    prev_index_walk = 0
+
+    #add new walk tracks
+    if len(array_sizes) > len(walkTrack):
+        for i in range(len(walkTrack), len(array_sizes)):
+            walkTrack.append(wt.WalkTrack(hum_id))
+            hum_id += 1
+
+    #remove walk tracks
+    #you can identify them by the zeros in the num_clusters array
+    elif len(array_sizes) < len(walkTrack):
+        sumV = 0
+        k = 0
+        for j in range(0, len(num_clusters)):
+            if num_clusters[j] == 0:
+                if sumV == 0:
+                    if j == 0:
+                        #the first part of traced cluster is removed
+                        del walkTrack[0]
+                    else:
+                        #case where the removed clusters were in a row
+                        del walkTrack[k]
+
+                else:
+                    #the last cluster disappeared
+                    if j == len(num_clusters)-1:
+                        del walkTrack[len(walkTrack)-1]
+                    else:
+                        pos = np.where(array_sizes == sumV)[0]
+                        del walkTrack[pos+ (k+1)]
+                        sumV = 0
+
+            if sumV == array_sizes[k]:
+                k = k + 1
+                sumV = 0
+		    
+            sumV += num_clusters[j]
+
+        num_clusters = num_clusters[num_clusters != 0]
+
+
+    tot_sum = 0
+    cl_index = 0
+
+    for i in range(0, len(array_sizes)):
+        xk = []
+        yk = []
+        zk = []
+
+        #(xk, yk, zk): 3D data points for each traced_cluster
+        for j in range(prev_index, prev_index+array_sizes[i]-1):
+            xk.append(xi[j])
+            yk.append(yi[j])
+            zk.append(zi[j])
+        prev_index = array_sizes[i] - 1
+       
+        
+        if walkTrack[i].is_new():
+            newCluster = True
+        else:
+            newCluster = False
+
+        #(xCl,yCl,zCl): data points for each cluster in a traced_cluster
+        xCl = []
+        yCl = []
+        zCl = []
+
+        for j in range(prev_index_walk, prev_index_walk+array_sizes[i]-1):
+
+            xCl.append(xi[j])
+            yCl.append(yi[j])
+            zCl.append(zi[j])
+           
+            #it is a cluster (part of traced one)
+            if len(xCl)-1 == num_clusters[cl_index]-1:
+                if newCluster:
+                    #call walk_analysis only if it is a human walk. 
+                    #Otherwise, check whether it was predicted that it was motionless in the previous cluster too. If yes then initialise its walk track.
+                    if human_predict(xCl,yCl,zCl) == 1:
+                        walk_analysis(xCl, yCl, i)
+                        walkTrack[i].set_stable(False)
+                    else:
+                        if walkTrack[i].is_stable():
+                            walkTrack[i].initialise()
+                        else:
+                            walk_analysis(xCl, yCl, i)
+
+                        walkTrack[i].set_stable(True)
+                cl_index += 1
+                tot_sum = tot_sum +len(xCl)
+                xCl = []
+                yCl = []
+                zCl = []
+
+            
+        prev_index_walk = array_sizes[i] - 1
+
+	# it takes only the last part-cluster bc the previous clusters where computed before (slice-window mode).
+        if human_predict(xCl,yCl,zCl) == 1:
+            walk_analysis(xCl, yCl, i)
+        else:
+            if walkTrack[i].is_stable():
+                walkTrack[i].initialise()
+            else:
+                walk_analysis(xCl, yCl, i)
+
+            walkTrack[i].set_stable(True)
+
+        tot_sum -= 1
+   
+
+        if publish_viz:
+            #TODO publish required arrays
+            print 'test'
+
+
+#Recognition whether a traced_cluster is following a pattern of a human walk or not.
 #Steps:
 #    - align each traced_cluster regarding the variances of each dimension
 #    - gridfit each aligned cluster -> becomes an image
@@ -286,6 +430,7 @@ def walk_analysis(x, y, pos):
 
     global timewindow, scan_time, distance, timestamp, cluster_parts
     global walkTrack, writeToFile, frame_id, results4meters_publisher
+    global dt_ratio
 
     split = len(x)/cluster_parts
     split_count = 0
@@ -294,7 +439,7 @@ def walk_analysis(x, y, pos):
     
     #the incrementation of time
     #    -> it is related to the time between scans
-    time_increment = scan_time*((timewindow-2)/cluster_parts) 
+    time_increment = (float(scan_time)/dt_ratio)*((timewindow-2)/cluster_parts)    
 
     if split == 0:
         return
@@ -309,6 +454,11 @@ def walk_analysis(x, y, pos):
 
         if not human.empty():
             human.add_distance(xmed, ymed)
+            if human.compute_error(xmed, ymed) == True:
+                print '-----\nHuman {} stops walking. Already distance {} in {} seconds\n-----'.format(human.get_id(), human.get_distance(), human.get_time())
+                human.initialise()
+                human.set_timestamp(timestamp)
+
         else:
             human.set_timestamp(timestamp)
 	

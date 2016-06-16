@@ -55,6 +55,7 @@ def clustering_procedure(buffer):
         scan_time = buffer.scan_time
 
         clear_data = np.zeros((len(buffer.x), 3))
+
         for i in range(0,len(buffer.x)):
             clear_data[i] = ([buffer.x[i], buffer.y[i], buffer.z[i]])
 

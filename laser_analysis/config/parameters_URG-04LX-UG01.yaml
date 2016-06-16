@@ -5,9 +5,9 @@ frame_id: "laser_link"
 classifier_file: "LDA_classifier.p" #place the file inside the classification_files folder.
 publish_viz: True
 viz_topic: "~viz_req"
-dt: 60
+dt: 50
 human_speed: 5
 distance: 4
-timewindow: 22
+timewindow: 20
 write_to_file: False
-file: '/home/rosturtle/Desktop/hprStat.csv'
+file: '/home/turtlebot/Desktop/joe_hpr_results/URG04stats.csv'

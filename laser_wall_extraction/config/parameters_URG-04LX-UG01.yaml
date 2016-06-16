@@ -1,10 +1,10 @@
 scan_topic: 'radio/scan'
-timewindow: 22
+timewindow: 20
 range_limit: 6
 use_overlap: True
 buffer_topic: '~buffer'
 frame_id: 'laser_link'
-dt: 60
+dt: 50
 human_speed: 5
 publish_viz: True
 viz_topic: "~viz_req"

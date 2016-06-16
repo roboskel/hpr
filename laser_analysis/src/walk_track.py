@@ -18,6 +18,8 @@ import scipy.spatial.distance as dist
 
 class WalkTrack:
 
+    threshold = 0.05
+
     def __init__(self, hum_id):
         self.new = True
         self.hum_id = hum_id
@@ -28,6 +30,7 @@ class WalkTrack:
         self.prevMedian = []
         self.timestamp = 0.0
         self.stable = False
+        self.stopCounter = 0
 
     def is_new(self):
         return self.new
@@ -77,6 +80,16 @@ class WalkTrack:
     def add_distance(self, x, y):
         self.tot_dist = self.tot_dist + dist.euclidean([x, y], self.prevMedian)
 
+
+    def compute_error(self, x, y):
+        if (dist.euclidean([x, y], self.prevMedian) <= self.threshold):
+            self.stopCounter += 1
+
+        if self.stopCounter == 4:
+            return True
+        return False
+
+
     def initialise(self):
         self.tot_dist = 0.0
         self.tot_time = 0.0
@@ -84,5 +97,6 @@ class WalkTrack:
         self.medY = []
         self.prevMedian = []
         self.stable = False
+        self.stopCounter = 0
 
 
