@@ -12,6 +12,7 @@ import scipy.spatial.distance as dist
 #    - prevMedian: the previous median (x,y)-point
 #    - timestamp: the time that the human started to walk, as it is declared from ROS.time
 #    - stable: checks whether the human is motionless or not
+#    - stopCounter: counter for how many frames the human is motionless
 #
 #Info:
 #   - Use of euclidean distance for the distance calculation between the points
@@ -19,6 +20,7 @@ import scipy.spatial.distance as dist
 class WalkTrack:
 
     threshold = 0.05
+    num_frames = 7
 
     def __init__(self, hum_id):
         self.new = True
@@ -85,7 +87,7 @@ class WalkTrack:
         if (dist.euclidean([x, y], self.prevMedian) <= self.threshold):
             self.stopCounter += 1
 
-        if self.stopCounter == 4:
+        if self.stopCounter == self.num_frames:
             return True
         return False
 
