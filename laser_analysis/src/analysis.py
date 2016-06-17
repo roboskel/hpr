@@ -10,12 +10,13 @@ from laser_analysis.msg import Analysis4MetersMsg
 import rospkg, math
 import walk_track as wt 
 import csv
+from sklearn.decomposition import PCA
 
 z = 0
 dt = 25;#period in ms (dt between scans)
 speed_ = 5;#human walking speed in km/h
 z_scale = float(speed_*dt) / float(3600)
-LDA_classifier = None
+Classifier = None
 results4meters_publisher = None
 scan_parts = 5
 cluster_parts = 4
@@ -29,6 +30,7 @@ writeToFile = False
 scan_time = 0.0
 timestamp = 0.0
 dt_ratio = 1.0
+pca_obj = PCA()
 
 #list_of<WalkTrack>: 
 #It contains information about the walk statistics (distance in meters, time for that distance) for each traced_cluster.
@@ -38,10 +40,11 @@ hum_id = 0
 
 
 def init():
-    global results4meters_publisher, frame_id, LDA_classifier, publish_viz, viz_publisher
+    global results4meters_publisher, frame_id, Classifier, publish_viz, viz_publisher
     global dt, speed_, z_scale
     global timewindow, distance
     global stat_file, writeToFile
+    global pca_obj
 
     rospy.init_node('laser_analysis')
 
@@ -57,6 +60,8 @@ def init():
     distance = rospy.get_param('~distance', 4)
     writeToFile = rospy.get_param('~write_to_file', False)
     stat_file = rospy.get_param('~file', '/home/hprStats.csv')
+    pca_file = rospy.get_param('~pca_file','/home/myPCA.p')
+
 
     print input_clusters_topic
 
@@ -66,7 +71,12 @@ def init():
     rospack = rospkg.RosPack()
 
     classifier_path = rospack.get_path('laser_analysis')+'/classification_files/'+classifier_file
-    LDA_classifier = pickle.load(open(classifier_path, "rb"))
+    Classifier = pickle.load(open(classifier_path, "rb"))
+
+    pca_path = rospack.get_path('laser_analysis')+'/classification_files/'+pca_file
+    pca_obj = pickle.load(open ( pca_path, "rb"))
+    
+
 
     rospy.Subscriber(input_clusters_topic, ClustersMsg, analysis)
     #rospy.Subscriber(input_clusters_topic, ClustersMsg, cluster_analysis)
@@ -372,10 +382,12 @@ def cluster_analysis(clusters_msg):
 #    - align each traced_cluster regarding the variances of each dimension
 #    - gridfit each aligned cluster -> becomes an image
 #    - hogs on each image for feature extraction
-#    - the prediction is achieved with the use of LDA trained classifier
+#    - the prediction is achieved with the use of LDA or SVM or NB+PCA trained classifier
 #Arguments:
 #    - (x,y,z): the 3D data points of a traced_cluster
 def human_predict(x, y, z):
+
+    global Classifier, pca_obj
 
     hogs=[]
 
@@ -409,7 +421,8 @@ def human_predict(x, y, z):
             temp.append(np.array(hogs[k]))
 
 
-    results = LDA_classifier.predict(temp)
+    #temp_pca = pca_obj.transform(temp)
+    results = Classifier.predict(temp)
     print 'predicted result = ',results
 
     return results[0]
@@ -454,10 +467,13 @@ def walk_analysis(x, y, pos):
 
         if not human.empty():
             human.add_distance(xmed, ymed)
+            print 'added dist = ',human.get_distance()
+            
             if human.compute_error(xmed, ymed) == True:
                 print '-----\nHuman {} stops walking. Already distance {} in {} seconds\n-----'.format(human.get_id(), human.get_distance(), human.get_time())
                 human.initialise()
                 human.set_timestamp(timestamp)
+            
 
         else:
             human.set_timestamp(timestamp)
