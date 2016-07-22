@@ -3,6 +3,7 @@
 import roslib, rospy
 import numpy as np
 import mytools as mt #DBSCAN function and perquisites are stored here
+import online_clustering as oncl
 from laser_wall_extraction.msg import BufferMsg
 from laser_clustering.msg import ClustersMsg
 from laser_clustering.msg import ClusterLabelsMsg
@@ -13,6 +14,7 @@ clusters_publisher = None
 frame_id = ''
 publish_cluster_labels = False
 cluster_labels_publisher = None
+use_overlap = False
 
 def init():
     global num_c, buffer_topic, clusters_publisher, frame_id
@@ -25,6 +27,7 @@ def init():
     frame_id = rospy.get_param('~frame_id', 'laser_link')
     clusters_topic = rospy.get_param('~clusters_topic', '~clusters')
     publish_cluster_labels = rospy.get_param('~publish_cluster_labels', False)
+    use_overlap = rospy.get_param('~use_overlap', True)
     cluster_labels_topic = rospy.get_param('~cluster_labels_topic', '~cluster_labels')
 
     rospy.Subscriber(buffer_topic, BufferMsg, clustering_procedure)
@@ -59,27 +62,53 @@ def clustering_procedure(buffer):
         for i in range(0,len(buffer.x)):
             clear_data[i] = ([buffer.x[i], buffer.y[i], buffer.z[i]])
 
-        Eps, cluster_labels= mt.dbscan(clear_data, num_c)
-
-        max_label=int(np.amax(cluster_labels))
-
         arr_sz = []
         x_ = []
         y_ = []
         z_ = []
+        num_clusters = []
 
-        for k in range(1,max_label+1) :
-            filter = np.where(cluster_labels==k)
+        if use_overlap:
 
-            if len(filter[0])>40 :
-                xk = np.array(buffer.x)[filter]
-                yk = np.array(buffer.y)[filter]
-                zk = np.array(buffer.z)[filter]
-                for i in range(0, len(xk)):
-                    x_.append(xk[i])
-                    y_.append(yk[i])
-                    z_.append(zk[i])
-                arr_sz.append(len(xk))
+            Eps, cluster_labels= mt.dbscan(clear_data, num_c)
+
+            max_label=int(np.amax(cluster_labels))
+
+            
+
+            for k in range(1,max_label+1) :
+                filter = np.where(cluster_labels==k)
+
+                if len(filter[0])>40 :
+                    xk = np.array(buffer.x)[filter]
+                    yk = np.array(buffer.y)[filter]
+                    zk = np.array(buffer.z)[filter]
+                    for i in range(0, len(xk)):
+                        x_.append(xk[i])
+                        y_.append(yk[i])
+                        z_.append(zk[i])
+                    arr_sz.append(len(xk))
+
+        else:
+            prev_clusters, cluster_label = oncl.onlineDBscan(clear_data, num_c)
+
+            for cl in prev_clusters:
+        
+                if len(x_) == 0:
+                    x_.append(cl.getPoints()[:, 0])
+                    y_.append(cl.getPoints()[:, 1])
+                    z_.append(cl.getPoints()[:, 2])
+                else:
+                    x_.append(x_, cl.getPoints()[:,0])
+                    y_.append(y_, cl.getPoints()[:,1])
+                    z_.append(z_, cl.getPoints()[:,2])
+
+                if len(num_clusters) == 0:
+                    num_clusters.append(cl.getSizes())
+                    arr_sz.append(cl.getNumPts())
+                else:
+                    num_clusters.extend(cl.getSizes())
+                    arr_sz.append(cl.getNumPts())
 
         clustersmsg = ClustersMsg()
         clustersmsg.header.stamp = rospy.Time.now()
@@ -89,7 +118,7 @@ def clustering_procedure(buffer):
         clustersmsg.y = y_
         clustersmsg.z = z_
         clustersmsg.array_sizes = arr_sz
-        clustersmsg.num_clusters = []
+        clustersmsg.num_clusters = num_clusters
         clustersmsg.scan_time = scan_time
         clusters_publisher.publish(clustersmsg)
 

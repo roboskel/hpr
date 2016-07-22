@@ -1,7 +1,7 @@
 scan_topic: 'scan'
 timewindow: 40
 range_limit: 10
-use_overlap: True
+use_overlap: False
 buffer_topic: '~buffer'
 frame_id: 'laser_link'
 dt: 25

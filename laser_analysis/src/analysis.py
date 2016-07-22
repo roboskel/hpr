@@ -109,12 +109,12 @@ def analysis(clusters_msg):
     xi = np.array(clusters_msg.x)
     yi = np.array(clusters_msg.y)
     zi = np.array(clusters_msg.z)
-    
     if len(xi) != 0:
         scan_time = clusters_msg.scan_time
 
         #ratio between the time that the laser scans to the time between them. zscale depends on dt value.
         dt_ratio = round(float(scan_time * 1000) / dt, 2) 
+        print 'dt_ration = ',dt_ratio
         timestamp = clusters_msg.header.stamp
     else:
         del walkTrack[:]
@@ -167,6 +167,8 @@ def analysis(clusters_msg):
 
     tot_sum = 0
     cl_index = 0
+
+    print '!!!!! array sizes = {}\n num_clusters = {}'.format(array_sizes, num_clusters)
 
     for i in range(0, len(array_sizes)):
         xk = []

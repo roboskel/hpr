@@ -15,6 +15,7 @@ timewindow = 40
 fr_index = 1
 
 z = 0
+z_end = 0.0
 dt = 25;#period in ms (dt between scans)
 speed = 5;#human walking speed in km/h
 z_scale = float(speed*dt) / float(3600)
@@ -28,6 +29,15 @@ frame_id = ''
 publish_viz = False
 viz_publisher = None
 wall_cart = None
+
+################################################
+#used only for testing the hypothetical laser scanner with worse quality
+
+scan_freq = 4 #because scantime_laser1 = 25msec and scantime_laser2 = 100msec
+state = 0  #denotes which frames we ll keep
+
+###############################################
+
 
 
 def init():
@@ -63,10 +73,12 @@ def init():
 
 def wall_extraction(laser_data):
     global wall_flag, w_index, scan2wall_limit, range_limit, timewindow, fr_index, buffer_publisher
-    global z, z_scale
+    global z, z_scale, z_end
     global mybuffer, wall, sampling, phi, mybuffer_tmp
     global use_overlap, overlap_part, frame_id
     global viz_publisher, publish_viz, wall_cart
+
+    global scan_freq, state
 
     laser_ranges = list(laser_data.ranges)
     
@@ -116,72 +128,78 @@ def wall_extraction(laser_data):
        
                 
     else:
-        if publish_viz:
-                wvm = WallVizMsg()
-                wvm.x = wall_cart[:,0]
-                wvm.y = wall_cart[:,1]
-                viz_publisher.publish(wvm)
-        #walls are set, process scans
-        ranges = np.array(laser_ranges)[sampling]
-        filter = np.where(ranges < wall) # filter out walls
-        ranges = ranges[filter]
-        theta = phi[filter]
+        if (state%scan_freq) == 0:
+		if publish_viz:
+		        wvm = WallVizMsg()
+		        wvm.x = wall_cart[:,0]
+		        wvm.y = wall_cart[:,1]
+		        viz_publisher.publish(wvm)
+		#walls are set, process scans
+		ranges = np.array(laser_ranges)[sampling]
+		filter = np.where(ranges < wall) # filter out walls
+		ranges = ranges[filter]
+		theta = phi[filter]
 
 
-        if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
-            C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
+		if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
+		    C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
-            if (fr_index == 1 ):
-                    if (len(overlap_part) == 0 or not use_overlap):
-                        mybuffer = C #mybuffer is the cartesian coord of the first scan
-                        #mybuffer_tmp = [C]
-                    else:
-                        mybuffer =  np.concatenate((overlap_part,C), axis=0 )
-                        overlap_part = []
-                        #mybuffer_tmp = [C]
-            else :
-                mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
-                #mybuffer_tmp.append((mybuffer_tmp,[C]))
+		    if (fr_index == 1 ):
+                            z = z_end
+		            if (len(overlap_part) == 0 or not use_overlap):
+		                mybuffer = C #mybuffer is the cartesian coord of the first scan
+		                #mybuffer_tmp = [C]
+		            else:
+		                mybuffer =  np.concatenate((overlap_part,C), axis=0 )
+		                overlap_part = []
+		                #mybuffer_tmp = [C]
+		    else :
+		        mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
+		        #mybuffer_tmp.append((mybuffer_tmp,[C]))
 
-                if(use_overlap):
-                    if fr_index == (timewindow-1):
-                        if (len(overlap_part) == 0):
-                            overlap_part = np.array(pol2cart(ranges,theta,0.0))
-                        else:
-                            overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+		        if(use_overlap):
+		            if fr_index == (timewindow-1):
+		                if (len(overlap_part) == 0):
+		                    overlap_part = np.array(pol2cart(ranges,theta,0.0))
+		                else:
+		                    overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
 
-            if (fr_index == timewindow ):
-                #define overlap_part as the 2 last frames of the current timewindow in order to be overlaped with the first frame of the next timewindow.
-                #It is neccessary for the overlap_trace function
-                if(use_overlap):
-                    overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+		    if (fr_index == timewindow ):
+		        #define overlap_part as the 2 last frames of the current timewindow in order to be overlaped with the first frame of the next timewindow.
+		        #It is neccessary for the overlap_trace function
+		        if(use_overlap):
+		            overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
 
-                mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
-                mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
+		        mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
+		        mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
 
 
-                if len(mybuffer > 3): #at least 3 points are needed to form a cluster
-                    buffmsg = BufferMsg()
-                    buffmsg.header.stamp = rospy.Time.now()
-                    buffmsg.header.frame_id = frame_id
-                    buffmsg.x = mybuffer[:,0]
-                    buffmsg.y = mybuffer[:,1]
-                    buffmsg.z = mybuffer[:,2]
-                    buffmsg.scan_time = laser_data.scan_time
-                    buffer_publisher.publish(buffmsg)
+		        if len(mybuffer > 3): #at least 3 points are needed to form a cluster
+		            buffmsg = BufferMsg()
+		            buffmsg.header.stamp = rospy.Time.now()
+		            buffmsg.header.frame_id = frame_id
+		            buffmsg.x = mybuffer[:,0]
+		            buffmsg.y = mybuffer[:,1]
+		            buffmsg.z = mybuffer[:,2]
+		            buffmsg.scan_time = laser_data.scan_time
+		            buffer_publisher.publish(buffmsg)
 
-                fr_index = 0
-                z = - z_scale
-            z = z + z_scale
-            fr_index = fr_index + 1
-        else:
-            buffmsg = BufferMsg()
-            buffmsg.header.stamp = rospy.Time.now()
-            buffmsg.header.frame_id = frame_id
-            buffmsg.x = []
-            buffmsg.y = []
-            buffmsg.z = []
-            buffer_publisher.publish(buffmsg)
+                        z_end = z + z_scale
+		        fr_index = 0
+		        z = - z_scale
+		    z = z + z_scale
+		    fr_index = fr_index + 1
+		else:
+		    buffmsg = BufferMsg()
+		    buffmsg.header.stamp = rospy.Time.now()
+		    buffmsg.header.frame_id = frame_id
+		    buffmsg.x = []
+		    buffmsg.y = []
+		    buffmsg.z = []
+		    buffer_publisher.publish(buffmsg)
+                    z_end = 0
+
+        state = state + 1
 
 
 #convert polar coordinates to cartesian

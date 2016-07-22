@@ -1,6 +1,6 @@
-scan_topic: 'radio/scan'
+scan_topic: 'scan'
 timewindow: 20
-range_limit: 6
+range_limit: 5
 use_overlap: True
 buffer_topic: '~buffer'
 frame_id: 'laser_link'
