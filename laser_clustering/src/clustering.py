@@ -93,22 +93,27 @@ def clustering_procedure(buffer):
             prev_clusters, cluster_label = oncl.onlineDBscan(clear_data, num_c)
 
             for cl in prev_clusters:
-        
+                
                 if len(x_) == 0:
                     x_.append(cl.getPoints()[:, 0])
                     y_.append(cl.getPoints()[:, 1])
                     z_.append(cl.getPoints()[:, 2])
                 else:
-                    x_.append(x_, cl.getPoints()[:,0])
-                    y_.append(y_, cl.getPoints()[:,1])
-                    z_.append(z_, cl.getPoints()[:,2])
+                    x_[0] = np.append(x_[0], cl.getPoints()[:,0], axis = 0)
+                    y_[0] = np.append(y_[0], cl.getPoints()[:,1], axis = 0)
+                    z_[0] = np.append(z_[0], cl.getPoints()[:,2], axis = 0)
 
                 if len(num_clusters) == 0:
-                    num_clusters.append(cl.getSizes())
-                    arr_sz.append(cl.getNumPts())
+                    num_clusters = np.array(cl.getSizes())
+                    arr_sz = [cl.getNumPts()]
                 else:
-                    num_clusters.extend(cl.getSizes())
+                    num_clusters = np.append(num_clusters, cl.getSizes(), axis = 0)
                     arr_sz.append(cl.getNumPts())
+
+            x_ = x_[0]
+            y_ = y_[0]
+            z_ = z_[0]
+
 
         clustersmsg = ClustersMsg()
         clustersmsg.header.stamp = rospy.Time.now()

@@ -16,23 +16,25 @@ class DBscanCluster:
 	self.medCore = np.zeros(points.shape[1])
 	self.numPts = points.shape[0]
 	self.points = points
-        self.sizes = np.array(self.numPts)
-	self._computeMedian()
+        self.sizes = [self.numPts]
+	#self._computeMedian()
 
 
     #add a new point to this cluster
     def addPoint(self, new_point):
 	self.points = np.append(self.points, [new_point], axis = 0)
-	self._computeMedian()
+	#self._computeMedian()
 	self.numPts = self.numPts + 1
 
     #remove some points of the set
     def removePoints(self, point_set):
         self.points = np.delete(self.points, np.s_[0:len(point_set)], 0)
+
         self.numPts = self.numPts - len(point_set)
-        self.sizes = np.delete(self.sizes, [0], 0)
+        del self.sizes[0]
+
         if len(self.sizes) == 0:
-            self.sizes = np.append(self.sizes, 0)
+            self.sizes.append(0)
 
 
 
@@ -59,16 +61,17 @@ class DBscanCluster:
 
     def addSize(self, sz):
 
-        self.sizes = np.append(self.sizes, sz)
+        self.sizes.append(sz)
         if self.sizes[0] == 1:
-            self.sizes = np.delete(self.sizes, 0, axis = 0)
+            del self.sizes[0]
 
 
     #add to the current cluster new points and update the median core
     #outlier: <DBscanCluster> instance. Represents an 'outlier cluster'
     def concat(self, outlier):
 	self.points = np.concatenate((self.points, outlier.getPoints()), axis=0)
+        
 	self.numPts = self.numPts + outlier.getNumPts()
-	self._computeMedian()
+	#self._computeMedian()
 
 
