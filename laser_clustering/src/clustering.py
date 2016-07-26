@@ -17,7 +17,7 @@ cluster_labels_publisher = None
 use_overlap = False
 
 def init():
-    global num_c, buffer_topic, clusters_publisher, frame_id
+    global num_c, buffer_topic, clusters_publisher, frame_id, use_overlap
     global publish_cluster_labels, cluster_labels_publisher
 
     rospy.init_node('laser_clustering')
@@ -74,7 +74,6 @@ def clustering_procedure(buffer):
 
             max_label=int(np.amax(cluster_labels))
 
-            
 
             for k in range(1,max_label+1) :
                 filter = np.where(cluster_labels==k)
@@ -109,6 +108,8 @@ def clustering_procedure(buffer):
                 else:
                     num_clusters = np.append(num_clusters, cl.getSizes(), axis = 0)
                     arr_sz.append(cl.getNumPts())
+                    if 0 in arr_sz:
+                        arr_sz = [i for i in arr_sz if i != 0]
 
             x_ = x_[0]
             y_ = y_[0]

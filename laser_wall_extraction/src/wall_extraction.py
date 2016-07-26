@@ -33,7 +33,7 @@ wall_cart = None
 ################################################
 #used only for testing the hypothetical laser scanner with worse quality
 
-scan_freq = 4 #because scantime_laser1 = 25msec and scantime_laser2 = 100msec
+scan_freq = 1 #because scantime_laser1 = 25msec and scantime_laser2 = 100msec
 state = 0  #denotes which frames we ll keep
 
 ###############################################
@@ -145,8 +145,10 @@ def wall_extraction(laser_data):
 		    C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
 		    if (fr_index == 1 ):
-                            z = z_end
+                            #if not use_overlap:
+                             #   z = z_end
 		            if (len(overlap_part) == 0 or not use_overlap):
+                                z = z_end
 		                mybuffer = C #mybuffer is the cartesian coord of the first scan
 		                #mybuffer_tmp = [C]
 		            else:
@@ -184,7 +186,9 @@ def wall_extraction(laser_data):
 		            buffmsg.scan_time = laser_data.scan_time
 		            buffer_publisher.publish(buffmsg)
 
-                        z_end = z + z_scale
+                        if not use_overlap:
+                            z_end = z + z_scale
+
 		        fr_index = 0
 		        z = - z_scale
 		    z = z + z_scale
@@ -197,7 +201,7 @@ def wall_extraction(laser_data):
 		    buffmsg.y = []
 		    buffmsg.z = []
 		    buffer_publisher.publish(buffmsg)
-                    z_end = 0
+                    #z_end = 0
 
         state = state + 1
 
