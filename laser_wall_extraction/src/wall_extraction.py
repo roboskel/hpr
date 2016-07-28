@@ -145,8 +145,6 @@ def wall_extraction(laser_data):
 		    C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
 		    if (fr_index == 1 ):
-                            #if not use_overlap:
-                             #   z = z_end
 		            if (len(overlap_part) == 0 or not use_overlap):
                                 z = z_end
 		                mybuffer = C #mybuffer is the cartesian coord of the first scan

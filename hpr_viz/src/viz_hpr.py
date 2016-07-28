@@ -17,7 +17,7 @@ plot_figure = None
 wall_x = []
 wall_y = []
 top_view_figure = None
-cc  =  ['r', 'c', '#808080', 'k',  '#FF6600', '#990099', '#0000FF', 'g','#8B4513','y','#FFD700']
+cc  =  ['r', 'c', 'k',  '#FF6600', '#990099', '#0000FF', 'g','#8B4513','y','#FFD700']
 clear_top_plot = True
 clear_clusters_plot = True
 clear_overlap_plot = True
@@ -143,11 +143,24 @@ def plot_clustering(data):
                 clusters_plot.set_xlabel('X - Distance')
                 clusters_plot.set_ylabel('Y - Robot')
                 clusters_plot.set_zlabel('Z - Time')
-                clusters_plot.scatter(data.x, data.y, data.z, 'z', 30, 'red')
+
+                prev_index = 0
+                for i in range(0, len(data.array_sizes)):
+                    xk = []
+                    yk = []
+                    zk = []
+
+                    for j in range(prev_index, prev_index+data.array_sizes[i]-1):
+                        xk.append(data.x[j])
+                        yk.append(data.y[j])
+                        zk.append(data.z[j])
+                    prev_index = data.array_sizes[i] 
+
+                    clusters_plot.scatter(xk, yk, zk, 'z', 30, cc[i%10])
 
 
             plt.draw()
-            plt.savefig(path+'clusters_'+str(img_counter), format='png')
+            #plt.savefig(path+'clusters_'+str(img_counter), format='png')
     
     else:
         if not clear_top_plot:
@@ -194,11 +207,11 @@ def plot_overlap(data):
                     zk.append(data.z[j])
                 prev_index = array_sizes[i] - 1
 
-                overlap_plot.scatter(xk, yk, zk, 'z', 30, cc[i%12])
+                overlap_plot.scatter(xk, yk, zk, 'z', 30, cc[i%10])
 
        
             plt.draw()
-            plt.savefig(path+'tracedCl_'+str(img_counter), format='png')
+            #plt.savefig(path+'tracedCl_'+str(img_counter), format='png')
             img_counter += 1
     
     else:

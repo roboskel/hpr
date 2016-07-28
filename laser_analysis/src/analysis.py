@@ -114,7 +114,7 @@ def analysis(clusters_msg):
 
         #ratio between the time that the laser scans to the time between them. zscale depends on dt value.
         dt_ratio = round(float(scan_time * 1000) / dt, 2) 
-        print 'dt_ration = ',dt_ratio
+        print 'dt_ration = {}, scan_time = {}'.format(dt_ratio, scan_time)
         timestamp = clusters_msg.header.stamp
     else:
         del walkTrack[:]
@@ -168,7 +168,6 @@ def analysis(clusters_msg):
     tot_sum = 0
     cl_index = 0
 
-    print '!!!!! array sizes = {}\n num_clusters = {}'.format(array_sizes, num_clusters)
 
     for i in range(0, len(array_sizes)):
         xk = []
@@ -196,7 +195,7 @@ def analysis(clusters_msg):
 
             xCl.append(xi[j])
             yCl.append(yi[j])
-           
+
             #it is a cluster (part of traced one)
             if len(xCl)-1 == num_clusters[cl_index]-1:
                 if newCluster:
@@ -213,6 +212,10 @@ def analysis(clusters_msg):
 
                         walkTrack[i].set_stable(True)
                 cl_index += 1
+
+                if cl_index == len(num_clusters):
+                    cl_index = 0
+                    break
                 tot_sum = tot_sum +len(xCl)
                 xCl = []
                 yCl = []
@@ -361,6 +364,7 @@ def cluster_analysis(clusters_msg):
         prev_index_walk = array_sizes[i] - 1
 
 	# it takes only the last part-cluster bc the previous clusters where computed before (slice-window mode).
+        
         if human_predict(xCl,yCl,zCl) == 1:
             walk_analysis(xCl, yCl, i)
         else:
@@ -370,7 +374,7 @@ def cluster_analysis(clusters_msg):
                 walk_analysis(xCl, yCl, i)
 
             walkTrack[i].set_stable(True)
-
+        
         tot_sum -= 1
    
 
@@ -469,7 +473,7 @@ def walk_analysis(x, y, pos):
 
         if not human.empty():
             human.add_distance(xmed, ymed)
-            print 'added dist = ',human.get_distance()
+            #print 'added dist = ',human.get_distance()
             
             if human.compute_error(xmed, ymed) == True:
                 print '-----\nHuman {} stops walking. Already distance {} in {} seconds\n-----'.format(human.get_id(), human.get_distance(), human.get_time())

@@ -108,6 +108,7 @@ def clustering_procedure(buffer):
                 else:
                     num_clusters = np.append(num_clusters, cl.getSizes(), axis = 0)
                     arr_sz.append(cl.getNumPts())
+
                     if 0 in arr_sz:
                         arr_sz = [i for i in arr_sz if i != 0]
 
