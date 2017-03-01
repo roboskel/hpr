@@ -1,0 +1,10 @@
+scan_topic: 'scan'
+timewindow: 20
+range_limit: 5
+use_overlap: False
+buffer_topic: '~buffer'
+frame_id: 'laser_link'
+dt: 50
+human_speed: 5
+publish_viz: True
+viz_topic: "~viz_req"

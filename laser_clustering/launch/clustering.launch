@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<launch>
+	<master auto="start"/>
+
+	<node pkg="laser_clustering" type="clustering.py" respawn="false" name="laser_clustering" output="screen">
+		<rosparam file="$(find laser_clustering)/config/parameters.yaml" command="load" />
+	</node>
+</launch>

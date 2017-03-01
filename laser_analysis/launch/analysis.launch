@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<launch>
+	<master auto="start"/>
+
+	<node pkg="laser_analysis" type="analysis.py" respawn="false" name="laser_analysis" output="screen">
+		<rosparam file="$(find laser_analysis)/config/parameters.yaml" command="load" />
+	</node>
+</launch>
