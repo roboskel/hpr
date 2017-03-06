@@ -78,8 +78,8 @@ def init():
     
 
 
-    rospy.Subscriber(input_clusters_topic, ClustersMsg, analysis)
-    #rospy.Subscriber(input_clusters_topic, ClustersMsg, cluster_analysis)
+    #rospy.Subscriber(input_clusters_topic, ClustersMsg, analysis)
+    rospy.Subscriber(input_clusters_topic, ClustersMsg, cluster_analysis)
 
     results4meters_publisher = rospy.Publisher(results4meters_topic, Analysis4MetersMsg, queue_size=10)
 
