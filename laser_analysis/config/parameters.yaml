@@ -10,6 +10,7 @@ viz_topic: "~viz_req"
 dt: 25
 human_speed: 5
 distance: 4
+min_distance: 1
 timewindow: 40
 write_to_file: False
 file: '/home/rosturtle/Desktop/hprStat.csv'
