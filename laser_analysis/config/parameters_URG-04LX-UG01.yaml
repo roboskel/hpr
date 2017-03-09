@@ -1,5 +1,5 @@
-#input_clusters_topic: "laser_clustering/clusters" #"laser_clustering/clusters" #"laser_overlap_trace/clusters"
-input_clusters_topic: "laser_overlap_trace/clusters"
+input_clusters_topic: "laser_clustering/clusters" #"laser_clustering/clusters" #"laser_overlap_trace/clusters"
+#input_clusters_topic: "laser_overlap_trace/clusters"
 results4meters_topic: "~results4meters"
 frame_id: "laser_link"
 #classifier_file: "SVM_classifier.p" #place the file inside the classification_files folder.
@@ -12,6 +12,6 @@ human_speed: 5
 distance: 4
 min_distance: 1
 timewindow: 20
-write_to_file: True
+write_to_file: False
 file: '/home/rosturtle/Desktop/URG04stats.csv'
 pca_file: "PCA_object.p"  #place the file inside the classification_files folder.
