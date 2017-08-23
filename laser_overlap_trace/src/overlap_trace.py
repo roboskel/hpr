@@ -312,6 +312,7 @@ def overlap_trace(clusters_msg):
                 cls_msg.x = x_
                 cls_msg.y = y_
                 cls_msg.z = z_
+                cls_msg.frames = clusters_msg.frames
                 cls_msg.array_sizes = arr_sz
                 cls_msg.scan_time = scan_time
                 cls_msg.num_clusters = index_clusters

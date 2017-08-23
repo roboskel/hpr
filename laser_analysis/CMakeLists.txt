@@ -19,6 +19,7 @@ find_package(Boost 1.40 COMPONENTS program_options REQUIRED)
 add_message_files(
   FILES
   Analysis4MetersMsg.msg
+  HumanPredictionMsg.msg
 )
 
 generate_messages(

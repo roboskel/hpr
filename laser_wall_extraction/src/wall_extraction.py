@@ -25,6 +25,7 @@ overlap_part = []
 
 buffer_publisher = None
 frame_id = ''
+frames_array = []
 
 publish_viz = False
 viz_publisher = None
@@ -78,9 +79,10 @@ def wall_extraction(laser_data):
     global use_overlap, overlap_part, frame_id
     global viz_publisher, publish_viz, wall_cart
 
-    global scan_freq, state
+    global scan_freq, state, frames_array
 
     laser_ranges = list(laser_data.ranges)
+    laser_header = laser_data.header
     
     for i in range(0, len(laser_ranges)):
         if laser_ranges[i]>range_limit:
@@ -129,77 +131,83 @@ def wall_extraction(laser_data):
                 
     else:
         if (state%scan_freq) == 0:
-		if publish_viz:
-		        wvm = WallVizMsg()
-		        wvm.x = wall_cart[:,0]
-		        wvm.y = wall_cart[:,1]
-		        viz_publisher.publish(wvm)
-		#walls are set, process scans
-		ranges = np.array(laser_ranges)[sampling]
-		filter = np.where(ranges < wall) # filter out walls
-		ranges = ranges[filter]
-		theta = phi[filter]
+            if publish_viz:
+                wvm = WallVizMsg()
+                wvm.x = wall_cart[:,0]
+                wvm.y = wall_cart[:,1]
+                viz_publisher.publish(wvm)
+            #walls are set, process scans
+            ranges = np.array(laser_ranges)[sampling]
+            filter = np.where(ranges < wall) # filter out walls
+            ranges = ranges[filter]
+            theta = phi[filter]
+
+            if not(len(ranges) == 0):
+                frames_array.append(laser_header.seq)
 
 
-		if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
-		    C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
+            if (len(ranges)>3): #each scan should consist of at least 3 points to be valid
+                C = np.array(pol2cart(ranges, theta, z) ) #convert to Cartesian
 
-		    if (fr_index == 1 ):
-		            if (len(overlap_part) == 0 or not use_overlap):
-                                z = z_end
-		                mybuffer = C #mybuffer is the cartesian coord of the first scan
-		                #mybuffer_tmp = [C]
-		            else:
-		                mybuffer =  np.concatenate((overlap_part,C), axis=0 )
-		                overlap_part = []
-		                #mybuffer_tmp = [C]
-		    else :
-		        mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
-		        #mybuffer_tmp.append((mybuffer_tmp,[C]))
+                if (fr_index == 1 ):
+                    if (len(overlap_part) == 0 or not use_overlap):
+                        z = z_end
+                        mybuffer = C #mybuffer is the cartesian coord of the first scan
+                        #mybuffer_tmp = [C]
+                    else:
+                        mybuffer =  np.concatenate((overlap_part,C), axis=0 )
+                        overlap_part = []
+                        #mybuffer_tmp = [C]
+                else :
+                    mybuffer = np.concatenate((mybuffer,C), axis=0 )  #  add the next incoming scans to mybuffer until you have <timewindow>scans
+                    #mybuffer_tmp.append((mybuffer_tmp,[C]))
 
-		        if(use_overlap):
-		            if fr_index == (timewindow-1):
-		                if (len(overlap_part) == 0):
-		                    overlap_part = np.array(pol2cart(ranges,theta,0.0))
-		                else:
-		                    overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+                    if(use_overlap):
+                        if fr_index == (timewindow-1):
+                            if (len(overlap_part) == 0):
+                                overlap_part = np.array(pol2cart(ranges,theta,0.0))
+                            else:
+                                overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
 
-		    if (fr_index == timewindow ):
-		        #define overlap_part as the 2 last frames of the current timewindow in order to be overlaped with the first frame of the next timewindow.
-		        #It is neccessary for the overlap_trace function
-		        if(use_overlap):
-		            overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
+                if (fr_index == timewindow ):
+                    #define overlap_part as the 2 last frames of the current timewindow in order to be overlaped with the first frame of the next timewindow.
+                    #It is neccessary for the overlap_trace function
+                    if(use_overlap):
+                        overlap_part = np.concatenate((overlap_part, np.array(pol2cart(ranges,theta,0.0)) ) , axis=0)
 
-		        mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
-		        mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
+                    mybuffer=mybuffer[np.where( mybuffer[:,0] > 0.2),:][0] #mishits safety margin
+                    mybuffer=mybuffer[np.where( mybuffer[:,0] < range_limit),:][0]#ignore distant points
 
 
-		        if len(mybuffer > 3): #at least 3 points are needed to form a cluster
-		            buffmsg = BufferMsg()
-		            buffmsg.header.stamp = rospy.Time.now()
-		            buffmsg.header.frame_id = frame_id
-		            buffmsg.x = mybuffer[:,0]
-		            buffmsg.y = mybuffer[:,1]
-		            buffmsg.z = mybuffer[:,2]
-		            buffmsg.scan_time = laser_data.scan_time
-		            buffer_publisher.publish(buffmsg)
+                    if len(mybuffer > 3): #at least 3 points are needed to form a cluster
+                        buffmsg = BufferMsg()
+                        buffmsg.header.stamp = rospy.Time.now()
+                        buffmsg.header.frame_id = frame_id
+                        buffmsg.x = mybuffer[:,0]
+                        buffmsg.y = mybuffer[:,1]
+                        buffmsg.z = mybuffer[:,2]
+                        buffmsg.scan_time = laser_data.scan_time
+                        buffmsg.frames = frames_array
+                        buffer_publisher.publish(buffmsg)
 
-                        if not use_overlap:
-                            z_end = z + z_scale
+                    if not use_overlap:
+                        z_end = z + z_scale
 
-		        fr_index = 0
-		        z = - z_scale
-		    z = z + z_scale
-		    fr_index = fr_index + 1
-		else:
-		    buffmsg = BufferMsg()
-		    buffmsg.header.stamp = rospy.Time.now()
-		    buffmsg.header.frame_id = frame_id
-		    buffmsg.x = []
-		    buffmsg.y = []
-		    buffmsg.z = []
-		    buffer_publisher.publish(buffmsg)
-                    #z_end = 0
+                    fr_index = 0
+                    z = - z_scale
+                    del frames_array[:]
+                z = z + z_scale
+                fr_index = fr_index + 1
+            else:
+                buffmsg = BufferMsg()
+                buffmsg.header.stamp = rospy.Time.now()
+                buffmsg.header.frame_id = frame_id
+                buffmsg.x = []
+                buffmsg.y = []
+                buffmsg.z = []
+                buffmsg.frames = []
+                buffer_publisher.publish(buffmsg)
+                #z_end = 0
 
         state = state + 1
 

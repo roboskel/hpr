@@ -1,5 +1,5 @@
 wall_input_topic: "laser_wall_extraction/viz_req"
 clustering_input_topic: "laser_clustering/clusters"
 overlap_input_topic: "laser_overlap_trace/clusters"
-num_of_diagrams: 3
+num_of_diagrams: 2
 pause_function: False

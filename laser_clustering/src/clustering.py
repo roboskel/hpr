@@ -49,6 +49,7 @@ def clustering_procedure(buffer):
         clustersmsg.x = []
         clustersmsg.y = []
         clustersmsg.z = []
+        clustersmsg.frames = []
 
         #empty array_sizes means that anyone listening to this message won't loop through the data
         clustersmsg.array_sizes = []
@@ -124,6 +125,7 @@ def clustering_procedure(buffer):
         clustersmsg.x = x_
         clustersmsg.y = y_
         clustersmsg.z = z_
+        clustersmsg.frames = buffer.frames
         clustersmsg.array_sizes = arr_sz
         clustersmsg.num_clusters = num_clusters
         clustersmsg.scan_time = scan_time

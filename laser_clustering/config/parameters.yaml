@@ -3,5 +3,5 @@ buffer_topic: 'laser_wall_extraction/buffer'
 frame_id: 'laser_link'
 clusters_topic: '~clusters'
 publish_cluster_labels: False
-use_overlap: False
+use_overlap: True
 cluster_labels_topic: '~cluster_labels'
