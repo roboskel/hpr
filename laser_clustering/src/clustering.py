@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-
-import roslib, rospy
+import roslib,rospy
 import numpy as np
 import mytools as mt #DBSCAN function and perquisites are stored here
 import online_clustering as oncl
@@ -69,6 +68,7 @@ def clustering_procedure(buffer):
         z_ = []
         num_clusters = []
 
+        #classic DBscan with the overlap track method
         if use_overlap:
 
             Eps, cluster_labels= mt.dbscan(clear_data, num_c)
@@ -88,7 +88,7 @@ def clustering_procedure(buffer):
                         y_.append(yk[i])
                         z_.append(zk[i])
                     arr_sz.append(len(xk))
-
+        #online dbscan
         else:
             prev_clusters, cluster_label = oncl.onlineDBscan(clear_data, num_c)
 

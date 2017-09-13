@@ -9,12 +9,12 @@ find_package(catkin REQUIRED COMPONENTS
   roslib
   std_msgs
   sensor_msgs
-#  message_generation
+  #message_generation
 )
 
 #add_message_files(
 #  FILES
-#  ClustersMsg.msg
+#  TraceMsg.msg
 #)
 
 #generate_messages(

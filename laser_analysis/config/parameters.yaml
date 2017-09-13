@@ -9,6 +9,7 @@ publish_viz: True
 viz_topic: "~viz_req"
 dt: 25
 human_speed: 5
+cluster_parts: 4
 distance: 4
 min_distance: 1
 timewindow: 40

@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import roslib, rospy
 import numpy as np
-import csv
 from sensor_msgs.msg import LaserScan
 from laser_wall_extraction.msg import BufferMsg
 from laser_wall_extraction.msg import WallVizMsg

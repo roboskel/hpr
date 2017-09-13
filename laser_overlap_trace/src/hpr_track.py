@@ -1,10 +1,17 @@
 import numpy as np
 
 """
-Represents a single track
+Represents a single track with a slide window mode.
+
+Attributes:
+    - track_id : identifier of the track
+    - tw_counter: denotes the timewindow where this track is previously updated
+    - clusters: dictionary to store the traced clusters. 
+        * The key represents the timewindow where the traced cluster is produced.
+        * The value is the cluster (set of points) that belongs to this track with a <[ array(X), array(Y), array(Z)]> representation 
 """
 class HprTrack:
-    cl_threshold = 4
+    num_slide_window = 4
     
     def __init__(self, track_id, points, tw_counter):
         self.track_id = track_id
@@ -15,11 +22,11 @@ class HprTrack:
     def update(self, points, tw):
         self.clusters.update({ tw:points })
         self.tw_counter = tw
-        # remove the clusters that appeared <cl_threshold> timewindows ago
+        # remove the clusters that appeared <num_slide_window> timewindows ago
         self.remove_part()
 
     def remove_part(self):
-        key = self.tw_counter - self.cl_threshold
+        key = self.tw_counter - self.num_slide_window
         self.clusters.pop(key, None)
 
     #Combines the points (x,y,z) of all the available timewindows in single arrays.
@@ -37,7 +44,7 @@ class HprTrack:
         sorted_clusters = sorted(cl)
 
         for tw_item in sorted_clusters:
-            if not (zValues == None):
+            if not (zValues is None):
                 z_last = zValues[-1]
                 increment = 1
 
@@ -63,6 +70,12 @@ class HprTrack:
 
         return xValues, yValues, zValues, sizeArray
 
+    def get_last_part(self):
+        maxKey = max(self.clusters, key=int)
+
+        return self.clusters.get(maxKey)
+
+
 """
 Holds and handles all the tracks
 """
@@ -78,7 +91,7 @@ class Tracker:
     def update_track(self, trackId, points):
         track = next( (t for t in self.track_array if t.track_id == trackId), None)
 
-        if not (track == None):
+        if not (track is None):
             #print 'Tracker :: ready to update a the track {} and the new tw = {} '.format(track.track_id, self.tw_counter)
             track.update(points, self.tw_counter)
 
@@ -93,7 +106,7 @@ class Tracker:
     def update(self):
         self.tw_counter += 1
 
-        #Removes the tracks that are <X> tw away
+        #Removes the tracks that are <tw_threshold> timewindows away
         for tr in self.track_array:
             if (self.tw_counter - tr.tw_counter) > self.tw_threshold:
                 self.track_array.remove(tr)
@@ -117,21 +130,32 @@ class Tracker:
             return previousIds, lastPart
         return None, None
 
+    def previous_fit(self, cluster):
+        minDist = 0.0
 
+        previousTracks = [t for t in self.track_array if t.tw_counter < self.tw_counter]
+
+        if len(previousTracks) == 0:
+            return None
+       #else:
+        #    candidateCls = [candidate.get_last_trace() for candidate in previousTracks]
+
+        return previousTracks
+
+
+    #Return all the tracks until now
     def combine_tracks(self, z_scale):
-        clusterSeparation = []
-        clusterSizes = []
+        clusterSeparation = []  #indicates whether a track changes to another track
+        clusterSizes = []   #keeps the size of each cluster for each track.
         X_ = None
         Y_ = None
         Z_ = None
-
-        lastPart = [t for t in self.track_array if t.tw_counter == self.tw_counter]
 
         for i,track in enumerate(self.track_array):
             xValues, yValues, zValues, sizeArray = track.get_points(z_scale)
             clusterSizes = clusterSizes + sizeArray
 
-            if X_ == None:
+            if X_ is None:
                 X_ = np.array(xValues)
                 Y_ = np.array(yValues)
                 Z_ = np.array(zValues)
@@ -144,36 +168,33 @@ class Tracker:
 
         return X_, Y_, Z_, clusterSizes, clusterSeparation
 
+    #Return the trace of the current timewindow for all the available tracks
+    def get_last_trace(self):
+        traceSeparation = []
+        idArray = []
+        X_ = None
+        Y_ = None
+        Z_ = None
 
-        """
-        #for every tracked cluster
-        for i in range(0, len(self.track_array)):
-            if len(tracks[i]) == 0:
-                 index_clusters.append(0)
-                 continue
-            #initialize x,y,z of trackedCluster_i
-            xar = np.array(tracks[i][0][0])
-            yar = np.array(tracks[i][0][1])
-            zar = np.array(tracks[i][0][2])
+        currentTracks = [t for t in self.track_array if t.tw_counter == self.tw_counter]
 
-            index_clusters.append(len(xar))
+        for track in currentTracks:
+            idArray.append(track.track_id)
 
-            #z dimension changes: 
-            #Each timewindow resets the time, thus the time (z dimention) begins from 0.0.
-            #In order to combine the points of the available timewindows, the time should increment periodically in each set of timewindow points.
-            for j in range(1, len(tracks[i])):
-                 xar = np.append(xar,tracks[i][j][0])
-                 yar = np.append(yar,tracks[i][j][1])
-                 B = tracks[i][j][2].copy()
-               
-                 index_clusters.append(len(tracks[i][j][0]))
+            lastPart = track.clusters.get(self.tw_counter)
 
-                 increment = zar[len(zar) - 1] + z_scale
-                 B[::1]  += increment
-                 zar =  np.append(zar,B)    
+            if X_ is None:
+                X_ = np.array(lastPart[0])
+                Y_ = np.array(lastPart[1])
+                Z_ = np.array(lastPart[2])
+            else:
+                X_ = np.append(X_, lastPart[0])
+                Y_ = np.append(Y_, lastPart[1])
+                Z_ = np.append(Z_, lastPart[2])
 
-            final_clusters.append([xar,yar,zar])
-        """
+            traceSeparation.append(len(lastPart[0]))
+
+        return X_, Y_, Z_, traceSeparation, idArray
 
 
 

@@ -1,5 +1,6 @@
 input_clusters_topic: "laser_clustering/clusters"
 output_clusters_topic: "~clusters"
+output_tracks_topic: "~tracks"
 frame_id: "laser_link"
 dt: 25
 human_speed: 5

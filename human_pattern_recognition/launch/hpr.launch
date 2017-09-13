@@ -15,7 +15,7 @@
 		<rosparam file="$(find laser_clustering)/config/parameters.yaml" command="load" />
 	</node>
 
-	<node pkg="laser_analysis" type="analysis.py" respawn="false" name="laser_analysis" output="screen">
+	<node pkg="laser_analysis" type="walk_analysis.py" respawn="false" name="laser_walk_analysis" output="screen">
 		<rosparam file="$(find laser_analysis)/config/parameters.yaml" command="load" />
 	</node>
 

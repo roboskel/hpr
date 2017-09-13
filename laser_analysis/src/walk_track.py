@@ -1,3 +1,4 @@
+
 import scipy.spatial.distance as dist
 
 #Class that is used to keep necessary information for every traced_cluster about. It is useful for the walk_analysis procedure.
@@ -100,5 +101,4 @@ class WalkTrack:
         self.prevMedian = []
         self.stable = False
         self.stopCounter = 0
-
 
