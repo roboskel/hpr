@@ -5,4 +5,5 @@ float32[] z
 int32[] frames
 int32[] array_sizes
 int32[] num_clusters
+int32[] id_array
 float32 scan_time

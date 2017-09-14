@@ -81,7 +81,7 @@ def tracking_procedure(clusters_msg):
             for newCluster in cls:
                 trackHandler.add_track(newCluster)
 
-        x_, y_, z_, clusterSizes, clusterSeparation = trackHandler.combine_tracks(z_scale)
+        x_, y_, z_, clusterSizes, clusterSeparation, idTracks = trackHandler.combine_tracks(z_scale)
         twX, twY, twZ, traceSeparation, idArray = trackHandler.get_last_trace()
 
         cls_msg = ClustersMsg()
@@ -94,6 +94,7 @@ def tracking_procedure(clusters_msg):
         cls_msg.array_sizes = clusterSeparation
         cls_msg.scan_time = scan_time
         cls_msg.num_clusters = clusterSizes
+        cls_msg.id_array = idTracks
         tracks_publisher.publish(cls_msg)
 
         trace_msg = ClustersMsg()
@@ -105,7 +106,7 @@ def tracking_procedure(clusters_msg):
         trace_msg.frames = clusters_msg.frames
         trace_msg.array_sizes = traceSeparation
         trace_msg.scan_time = scan_time
-        trace_msg.num_clusters = idArray
+        trace_msg.id_array = idArray
         trace_publisher.publish(trace_msg)
         
     else:
@@ -148,7 +149,6 @@ def association_procedure(newClusters):
                 candidateCentroids = [get_centroid(cl.get_last_part(), True) for cl in candidateCls]
                 distArray = [euclidean(p1, currentCentroids[item[0]]) for p1 in candidateCentroids]
                 minDist = np.argmin(distArray)
-
 
                 #not far away -> combine it with this candidate
                 if distArray[minDist] < errorDist:

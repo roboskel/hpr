@@ -118,13 +118,13 @@ def trace_analysis(traces_msg):
         del walkAnalyser[:] #should we remove everything or keep them for some scans ???
 
     array_sizes = np.array(traces_msg.array_sizes)
-    num_clusters = np.array(traces_msg.num_clusters)
+    idArray = np.array(traces_msg.id_array)
     frames_array = traces_msg.frames
 
     prev_index = 0
 
     #there are some traces into it
-    for i, trace_id in enumerate(num_clusters):
+    for i, trace_id in enumerate(idArray):
         last_cluster_index = (array_sizes[i] + prev_index - 1)
         xk = x_[prev_index:last_cluster_index]
         yk = y_[prev_index:last_cluster_index]

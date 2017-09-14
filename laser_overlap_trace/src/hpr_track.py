@@ -147,6 +147,7 @@ class Tracker:
     def combine_tracks(self, z_scale):
         clusterSeparation = []  #indicates whether a track changes to another track
         clusterSizes = []   #keeps the size of each cluster for each track.
+        idArray = []    #keeps the track id
         X_ = None
         Y_ = None
         Z_ = None
@@ -154,6 +155,7 @@ class Tracker:
         for i,track in enumerate(self.track_array):
             xValues, yValues, zValues, sizeArray = track.get_points(z_scale)
             clusterSizes = clusterSizes + sizeArray
+            idArray.append(track.track_id)
 
             if X_ is None:
                 X_ = np.array(xValues)
@@ -166,7 +168,7 @@ class Tracker:
 
             clusterSeparation.append(sum(sizeArray))
 
-        return X_, Y_, Z_, clusterSizes, clusterSeparation
+        return X_, Y_, Z_, clusterSizes, clusterSeparation, idArray
 
     #Return the trace of the current timewindow for all the available tracks
     def get_last_trace(self):
