@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<launch>
-	<master auto="start"/>
-
-	<node pkg="laser_overlap_trace" type="overlap_trace.py" respawn="false" name="laser_overlap_trace" output="screen">
-		<rosparam file="$(find laser_overlap_trace)/config/parameters.yaml" command="load" />
-	</node>
-</launch>

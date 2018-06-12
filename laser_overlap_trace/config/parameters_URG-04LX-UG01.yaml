@@ -1,5 +1,0 @@
-input_clusters_topic: "laser_clustering/clusters"
-output_clusters_topic: "~clusters"
-frame_id: "laser_link"
-dt: 50
-human_speed: 5
