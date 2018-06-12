@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<launch>
+    <param name="use_sim_time" value="True" />
+        <node pkg="tf" type="static_transform_publisher" name="" args="0 0 0 0 0 0 1 base_link laser 100"/>
+
+    <include file="$(find laserscan_stacker)/launch/laserscan_stacker.launch"/>
+    <include file="$(find pointcloud2_segments_viz)/launch/pointcloud2_segments_viz.launch"/>
+</launch>
+
+
