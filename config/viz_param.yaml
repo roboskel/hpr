@@ -1,0 +1,3 @@
+input_topic: "pointcloud2_clustering/clusters"
+out_topic: "pointcloud2_segments_viz/pc2_viz"
+base_link_frame: "base_link"

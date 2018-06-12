@@ -4,7 +4,13 @@
         <node pkg="tf" type="static_transform_publisher" name="" args="0 0 0 0 0 0 1 base_link laser 100"/>
 
     <include file="$(find laserscan_stacker)/launch/laserscan_stacker.launch"/>
-    <include file="$(find pointcloud2_segments_viz)/launch/pointcloud2_segments_viz.launch"/>
+
+    <node pkg="pointcloud2_segments_viz" type="pointcloud2_segments_viz" respawn="false" name="pointcloud2_segments_viz" output="screen">
+        <rosparam file="$(find hpr)/config/viz_param.yaml" command="load" />
+    </node>
+
+    <include file="$(find pointcloud2_clustering)/launch/pointcloud2_clustering.launch"/>
+
 </launch>
 
 
