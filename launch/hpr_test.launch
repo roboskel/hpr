@@ -11,6 +11,7 @@
 
     <include file="$(find pointcloud2_clustering)/launch/pointcloud2_clustering.launch"/>
 
+    <include file="$(find pointcloud2_cluster_tracking)/launch/pointcloud2_cluster_tracking.launch"/>
 </launch>
 
 
