@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <launch>
-    <param name="use_sim_time" value="False" />
+    <arg name="use_sim_time" default="False" />
+    <param name="use_sim_time" value="$(arg use_sim_time)" />
     <!-- some rosbags need param: use_sim_time = True . If you use scan topic (not from rosbag) or package roll_test , use_sim_time = False -->
     <node pkg="tf" type="static_transform_publisher" name="" args="0 0 0 0 0 0 1 base_link laser 100"/>
 
